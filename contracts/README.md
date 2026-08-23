@@ -4,7 +4,9 @@ This is a **Sepolia-only app-team draft**. It has not been declared, deployed,
 linked to the live STRK20 pool, or used with a wallet or funds. It is not an
 official StarkWare escrow package.
 
-The package now builds a stateful `GigstarkEscrow` Starknet contract. Its
+The package builds stateful `GigstarkEscrow` and `GigstarkSubscriptions`
+contracts, a `GigstarkPassportVerifier`, and an audience-bound
+`GigstarkTierGate`. The escrow
 constructor pins the privacy pool, arbitrator, and an external action-
 authorization verifier. The pool-only `privacy_invoke` route covers deposit,
 delivery, buyer confirmation, dispute opening, timeout refund, and one winner
@@ -20,9 +22,17 @@ winner note. They are public at the helper boundary and are not described as
 cryptographically hidden. User wallet addresses, private witnesses, delivery
 contents, and dispute evidence are not stored.
 
-The test-only `MockAuthorizationVerifier` proves the contract boundary, not a
-production authorization scheme. A reviewed cryptographic verifier for the
-per-escrow buyer and seller commitments remains a hard deployment blocker.
+`GigstarkPassportVerifier` consumes Stark-curve signed, action-bound proof
+receipts under an audience-specific policy. It rejects wrong audiences, roles,
+expiry, revoked policies, and scoped nullifier replay. It is clean-room
+Gigstark code and imports no Athera contract, root, trust, or network state. It
+is a signed receipt verifier for an opaque proof accepted off-chain, not a
+direct ZK circuit verifier.
+
+Subscriptions support one initial period, at most three total prepaid periods,
+cancellation, expiry, and one creator note per paid period. Claims unlock when
+the period is paid; cancellation blocks new prepayment but does not claw back
+already paid creator claims. There is no autonomous charging.
 
 Run:
 
@@ -30,13 +40,12 @@ Run:
 cd contracts
 scarb --version # must report 2.17.0
 snforge --version # must report 0.59.0
-SCARB_IGNORE_CAIRO_VERSION=true scarb build
-scarb run test
+scarb build
+snforge test
 ```
 
-The narrowly scoped Cairo-version override matches the pinned upstream RC.0
-workspace's OpenZeppelin 3.0 compatibility requirement; it is not a deployment
-approval. The dependency lock must remain checked in.
+The dependency lock must remain checked in. Twenty-five contract tests pass
+locally with the pinned toolchain, but this is not a deployment approval.
 
 The exact upstream release, live pool mismatch, and deployment gate are in
 `STRK20_SEPOLIA_PIN.md`.

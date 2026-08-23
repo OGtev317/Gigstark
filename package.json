@@ -7,12 +7,17 @@
     "build": "next build --webpack",
     "start": "next start",
     "test": "tsx --test tests/*.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts"
   },
   "dependencies": {
+    "@starknet-io/get-starknet-discovery": "6.0.2",
+    "@starknet-io/get-starknet-wallet-standard": "6.0.2",
+    "@starknet-io/types-js": "0.10.3",
     "next": "16.3.2",
     "react": "19.2.1",
-    "react-dom": "19.2.1"
+    "react-dom": "19.2.1",
+    "starknet": "10.4.0"
   },
   "devDependencies": {
     "@types/node": "24.10.2",

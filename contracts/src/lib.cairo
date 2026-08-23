@@ -6,6 +6,10 @@
 use privacy::objects::OpenNoteDeposit;
 use starknet::ContractAddress;
 
+pub mod gigstark_passport;
+pub mod subscriptions;
+pub mod tier_gate;
+
 pub const OP_DEPOSIT: u8 = 0;
 pub const OP_SUBMIT_DELIVERY: u8 = 1;
 pub const OP_CONFIRM_DELIVERY: u8 = 2;
@@ -26,6 +30,39 @@ pub const STATUS_BUYER_WINS: u8 = 5;
 
 pub const ACTION_STATEMENT_DOMAIN: felt252 = 'GIGSTARK_ACTION_V1';
 
+/// Minimal proof receipt consumed by the Starknet-native GigstarkPassport
+/// verifier. The receipt discloses no identity or witness. Its Stark-curve
+/// signature attests that an approved off-chain proof verifier accepted the
+/// opaque proof commitment for this exact policy and action.
+#[derive(Copy, Drop, Serde)]
+pub struct GigstarkPassportProof {
+    pub policy_id: felt252,
+    pub audience: ContractAddress,
+    pub purpose: u8,
+    pub credential_class: felt252,
+    pub scope_nullifier: felt252,
+    pub proof_commitment: felt252,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub signature_r: felt252,
+    pub signature_s: felt252,
+}
+
+pub fn empty_gigstark_passport_proof() -> GigstarkPassportProof {
+    GigstarkPassportProof {
+        policy_id: 0,
+        audience: 0.try_into().unwrap(),
+        purpose: 0,
+        credential_class: 0,
+        scope_nullifier: 0,
+        proof_commitment: 0,
+        issued_at: 0,
+        expires_at: 0,
+        signature_r: 0,
+        signature_s: 0,
+    }
+}
+
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct EscrowRecord {
     pub buyer_commitment: felt252,
@@ -42,14 +79,13 @@ pub struct EscrowRecord {
 
 #[starknet::interface]
 pub trait IActionAuthorizationVerifier<TContractState> {
-    /// Verifies an opaque authorization against an unlinkable, per-escrow role
+    /// Consumes a signed proof receipt bound to an unlinkable, per-escrow role
     /// commitment and the exact action statement computed by GigstarkEscrow.
-    /// The production verifier is deliberately outside this draft.
-    fn is_authorized(
-        self: @TContractState,
+    fn consume_authorization(
+        ref self: TContractState,
         role_commitment: felt252,
         action_statement: felt252,
-        authorization_digest: felt252,
+        proof: GigstarkPassportProof,
     ) -> bool;
 }
 
@@ -78,7 +114,7 @@ pub trait IGigstarkEscrow<TContractState> {
         delivery_commitment: felt252,
         deadline: u64,
         note_id: felt252,
-        authorization_digest: felt252,
+        proof: GigstarkPassportProof,
     ) -> Span<OpenNoteDeposit>;
 
     /// Dispute evidence stays off-chain. Only the constructor-pinned
@@ -108,6 +144,7 @@ pub mod errors {
     pub const INVALID_ROLE: felt252 = 'INVALID_ROLE';
     pub const ZERO_AUTHORIZATION: felt252 = 'ZERO_AUTH';
     pub const ACTION_NOT_AUTHORIZED: felt252 = 'ACTION_NOT_AUTH';
+    pub const INVALID_PROOF_PURPOSE: felt252 = 'BAD_PROOF_PURPOSE';
     pub const INSUFFICIENT_ESCROW_BALANCE: felt252 = 'INSUFFICIENT_BAL';
     pub const ACCOUNTED_BALANCE_UNDERFLOW: felt252 = 'BALANCE_UNDERFLOW';
     pub const DOUBLE_CLAIM: felt252 = 'DOUBLE_CLAIM';
@@ -125,12 +162,14 @@ pub mod GigstarkEscrow {
         StoragePointerWriteAccess,
     };
     use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use super::gigstark_passport::PASSPORT_PURPOSE_ESCROW_ROLE;
     use super::{
-        ACTION_STATEMENT_DOMAIN, EscrowRecord, IActionAuthorizationVerifierDispatcher,
-        IActionAuthorizationVerifierDispatcherTrait, IGigstarkEscrow, OP_CLAIM, OP_CONFIRM_DELIVERY,
-        OP_DEPOSIT, OP_OPEN_DISPUTE, OP_SUBMIT_DELIVERY, OP_TIMEOUT, ROLE_BUYER, ROLE_NONE,
-        ROLE_SELLER, STATUS_ACTIVE, STATUS_BUYER_WINS, STATUS_DELIVERED, STATUS_DISPUTED,
-        STATUS_NONE, STATUS_SELLER_WINS, errors,
+        ACTION_STATEMENT_DOMAIN, EscrowRecord, GigstarkPassportProof,
+        IActionAuthorizationVerifierDispatcher, IActionAuthorizationVerifierDispatcherTrait,
+        IGigstarkEscrow, OP_CLAIM, OP_CONFIRM_DELIVERY, OP_DEPOSIT, OP_OPEN_DISPUTE,
+        OP_SUBMIT_DELIVERY, OP_TIMEOUT, ROLE_BUYER, ROLE_NONE, ROLE_SELLER, STATUS_ACTIVE,
+        STATUS_BUYER_WINS, STATUS_DELIVERED, STATUS_DISPUTED, STATUS_NONE, STATUS_SELLER_WINS,
+        errors,
     };
 
     #[storage]
@@ -245,7 +284,7 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert(get_caller_address() == self.privacy_pool.read(), errors::ONLY_PRIVACY_POOL);
             assert(escrow_id != 0, errors::ZERO_ESCROW_ID);
@@ -262,7 +301,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else if operation == OP_SUBMIT_DELIVERY {
                 self
@@ -276,7 +315,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else if operation == OP_CONFIRM_DELIVERY {
                 self
@@ -290,7 +329,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else if operation == OP_OPEN_DISPUTE {
                 self
@@ -304,7 +343,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else if operation == OP_TIMEOUT {
                 self
@@ -318,7 +357,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else if operation == OP_CLAIM {
                 self
@@ -332,7 +371,7 @@ pub mod GigstarkEscrow {
                         delivery_commitment,
                         deadline,
                         note_id,
-                        authorization_digest,
+                        proof,
                     )
             } else {
                 panic_with_felt252(errors::INVALID_OPERATION)
@@ -368,12 +407,12 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert(actor_role == ROLE_NONE, errors::INVALID_OPERATION_DATA);
             assert(delivery_commitment == 0, errors::INVALID_OPERATION_DATA);
             assert(note_id == 0, errors::INVALID_OPERATION_DATA);
-            assert(authorization_digest == 0, errors::INVALID_OPERATION_DATA);
+            assert(proof.policy_id == 0, errors::INVALID_OPERATION_DATA);
             assert(token.is_non_zero(), errors::ZERO_TOKEN);
             assert(amount != 0, errors::ZERO_AMOUNT);
             assert(buyer_commitment != 0 && seller_commitment != 0, errors::ZERO_ROLE_COMMITMENT);
@@ -420,7 +459,7 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert_zero_common(
                 token, amount, buyer_commitment, seller_commitment, deadline, note_id,
@@ -431,12 +470,7 @@ pub mod GigstarkEscrow {
             assert(escrow.status == STATUS_ACTIVE, errors::INVALID_STATE);
             self
                 .assert_authorized(
-                    escrow_id,
-                    actor_role,
-                    escrow,
-                    OP_SUBMIT_DELIVERY,
-                    delivery_commitment,
-                    authorization_digest,
+                    escrow_id, actor_role, escrow, OP_SUBMIT_DELIVERY, delivery_commitment, proof,
                 );
             escrow.delivery_commitment = delivery_commitment;
             escrow.status = STATUS_DELIVERED;
@@ -457,7 +491,7 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert_zero_common(
                 token, amount, buyer_commitment, seller_commitment, deadline, note_id,
@@ -466,10 +500,7 @@ pub mod GigstarkEscrow {
             assert(actor_role == ROLE_BUYER, errors::INVALID_ROLE);
             let mut escrow = self.read_existing(escrow_id);
             assert(escrow.status == STATUS_DELIVERED, errors::INVALID_STATE);
-            self
-                .assert_authorized(
-                    escrow_id, actor_role, escrow, OP_CONFIRM_DELIVERY, 0, authorization_digest,
-                );
+            self.assert_authorized(escrow_id, actor_role, escrow, OP_CONFIRM_DELIVERY, 0, proof);
             escrow.status = STATUS_SELLER_WINS;
             escrow.action_nonce += 1;
             self.escrows.write(escrow_id, escrow);
@@ -488,7 +519,7 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert_zero_common(
                 token, amount, buyer_commitment, seller_commitment, deadline, note_id,
@@ -500,10 +531,7 @@ pub mod GigstarkEscrow {
                 escrow.status == STATUS_ACTIVE || escrow.status == STATUS_DELIVERED,
                 errors::INVALID_STATE,
             );
-            self
-                .assert_authorized(
-                    escrow_id, actor_role, escrow, OP_OPEN_DISPUTE, 0, authorization_digest,
-                );
+            self.assert_authorized(escrow_id, actor_role, escrow, OP_OPEN_DISPUTE, 0, proof);
             escrow.status = STATUS_DISPUTED;
             escrow.action_nonce += 1;
             self.escrows.write(escrow_id, escrow);
@@ -522,14 +550,14 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert_zero_common(
                 token, amount, buyer_commitment, seller_commitment, deadline, note_id,
             );
             assert(delivery_commitment == 0, errors::INVALID_OPERATION_DATA);
             assert(actor_role == ROLE_NONE, errors::INVALID_OPERATION_DATA);
-            assert(authorization_digest == 0, errors::INVALID_OPERATION_DATA);
+            assert(proof.policy_id == 0, errors::INVALID_OPERATION_DATA);
             let mut escrow = self.read_existing(escrow_id);
             assert(
                 escrow.status == STATUS_ACTIVE || escrow.status == STATUS_DELIVERED,
@@ -554,7 +582,7 @@ pub mod GigstarkEscrow {
             delivery_commitment: felt252,
             deadline: u64,
             note_id: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> Span<OpenNoteDeposit> {
             assert_zero_common(token, amount, buyer_commitment, seller_commitment, deadline, 0);
             assert(delivery_commitment == 0, errors::INVALID_OPERATION_DATA);
@@ -568,10 +596,7 @@ pub mod GigstarkEscrow {
             } else {
                 assert(!escrow.buyer_claimed, errors::DOUBLE_CLAIM);
             }
-            self
-                .assert_authorized(
-                    escrow_id, actor_role, escrow, OP_CLAIM, note_id, authorization_digest,
-                );
+            self.assert_authorized(escrow_id, actor_role, escrow, OP_CLAIM, note_id, proof);
 
             if seller_wins {
                 escrow.seller_claimed = true;
@@ -607,9 +632,10 @@ pub mod GigstarkEscrow {
             escrow: EscrowRecord,
             operation: u8,
             payload: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) {
-            assert(authorization_digest != 0, errors::ZERO_AUTHORIZATION);
+            assert(proof.policy_id != 0, errors::ZERO_AUTHORIZATION);
+            assert(proof.purpose == PASSPORT_PURPOSE_ESCROW_ROLE, errors::INVALID_PROOF_PURPOSE);
             let role_commitment = if actor_role == ROLE_BUYER {
                 escrow.buyer_commitment
             } else if actor_role == ROLE_SELLER {
@@ -624,7 +650,7 @@ pub mod GigstarkEscrow {
                 contract_address: self.authorization_verifier.read(),
             };
             assert(
-                verifier.is_authorized(role_commitment, action_statement, authorization_digest),
+                verifier.consume_authorization(role_commitment, action_statement, proof),
                 errors::ACTION_NOT_AUTHORIZED,
             );
         }

@@ -60,7 +60,7 @@ The original pure state kernel has been replaced by a stateful contract draft.
 
 ## Milestone 2 — production-shaped STRK20 escrow
 
-**Status: In progress — next milestone**
+**Status: In progress — implementation complete locally; review and pool mapping gated**
 
 Current progress:
 
@@ -69,15 +69,24 @@ Current progress:
   exact upstream commit.
 - A non-empty `GigstarkEscrow` contract artifact is generated.
 - Pool caller, collateral accounting, arbitrator, expiry, seller/buyer winner,
-  replay, approval, and double-claim tests pass locally.
+  role authorization, replay, approval, and double-claim tests pass locally.
 - The live Sepolia pool address currently reports an upgraded class hash that
-  does not match the RC.0 class hash in the upstream compatibility table.
-- The action-authorization verifier is a test mock, not a cryptographic
-  production verifier.
+  matches neither the source-built RC.0 class nor the source-built official V2
+  tag. The exact source package behind the live class is not published in the
+  reviewed deployment metadata.
+- A read-only chain/address/class verification command makes this release gate
+  reproducible and exits nonzero for the current unmapped class.
+- The clean-room `GigstarkPassportVerifier` is connected to buyer/seller action
+  authorization and cryptographically verifies action-bound signed receipts.
+- Twenty-five Cairo tests pass across escrow, passport, subscriptions, and
+  tier access.
+- Escrow, subscription, and tier consumers enforce distinct Passport purposes
+  before calling the verifier, preventing cross-purpose policy mistakes.
 
 ### Dependency and ABI pin
 
-- Resolve and lock the exact reviewed STRK20 Sepolia privacy package.
+- Obtain primary-source mapping from the observed Sepolia pool class to its
+  exact package/commit; the integration fails closed until this is reviewed.
 - Verify the current Sepolia privacy-pool address, class, ABI, and supported
   `privacy_invoke` action shape from primary sources.
 - Run the project with the pinned Scarb and Cairo toolchain rather than relying
@@ -92,9 +101,9 @@ Current progress:
 - Allow the pool alone to call `privacy_invoke`.
 - Define privacy-pool operations for deposit, delivery, buyer confirmation,
   dispute, timeout, and winner claim without exposing role identities.
-- Enforce buyer, seller, and arbitrator authorization through a separately
-  reviewed commitment/proof design; pool-only calling is not sufficient role
-  authorization.
+- Enforce buyer and seller authorization through action-bound role commitments
+  and consumed GigstarkPassport proof receipts. Arbitrator authority remains a
+  separately constructor-pinned address.
 - Verify that the helper token balance covers the previously accounted balance
   plus the requested deposit amount. Unsolicited surplus must remain
   unaccounted rather than block or inflate an escrow.
@@ -129,20 +138,32 @@ Declaration and deployment are not part of this milestone.
 
 ## Milestone 3 — Wallet API integration
 
-**Status: Planned**
+**Status: Integration draft complete; live end-to-end execution gated**
 
-- Detect compatible Starknet Wallet API and STRK20 capabilities without using
-  a private-balance request as a probe.
+- Compatible Starknet Wallet API versions are detected without using a private-
+  balance request as a probe.
 - Keep note discovery, proof generation, viewing keys, and spending keys inside
   the user's privacy-enabled wallet.
-- Prepare the open-note-plus-helper-invoke action before requesting a user
-  signature.
+- Build and prepare `withdraw -> invoke` for escrow deposits and `open transfer
+  -> invoke` for winner claims before requesting a user signature.
 - Display the exact network, helper, token, public amount boundary, expiry, and
   intended winner action before submission.
 - Fail closed on unsupported wallets, wrong chain, stale ABI, preparation
   errors, or mismatched contract configuration.
-- Add frontend tests for capability absence, rejection, malformed responses,
-  wrong-chain state, replayed UI actions, and successful preparation.
+- Unit tests cover version capability checks, exact action/calldata shapes,
+  malformed values, preparation versus submission, and fail-closed pool class
+  validation.
+- Preparation and submission query the provider for the current chain ID and
+  pool class instead of trusting class metadata supplied by the caller.
+- The browser exposes a read-only installed-wallet version check; it does not
+  connect an account, request balances or keys, or prepare/submit actions.
+
+Remaining:
+
+- Connect preparation to a review screen and explicit user-signature request.
+- Add wrong-chain and wallet-rejection UI tests.
+- Execute a reviewed Sepolia flow only after the live pool source mapping is
+  resolved.
 
 ### Milestone 3 exit gate
 
@@ -152,31 +173,38 @@ moving production funds.
 
 ## Milestone 4 — subscriptions and tier access
 
-**Status: Local models complete; contract and wallet integration planned**
+**Status: Contract and tier-gate drafts complete locally; wallet execution planned**
 
 - Start with one explicitly authorized paid period.
 - Support at most three prepaid periods, cancellation, expiry, and one private
   creator claim per paid period.
-- Define whether claims unlock at payment or period boundaries and enforce the
-  selected rule consistently in contract tests.
+- Creator claims unlock at payment; cancellation stops new prepayment but does
+  not remove already paid claims. Contract tests enforce this rule.
 - Reuse the reviewed pool-only note-return pattern without enabling autonomous
   charges.
-- Replace the simulated tier receipt checker only after a Starknet-native proof
-  and issuer/verifier trust model is designed and audited.
-- Bind tier proofs to the exact Gigstark audience, tier, policy, expiry, and a
-  scope-specific anti-replay value without wallet scanning.
+- `GigstarkTierGate` consumes proof receipts bound to the exact gate audience,
+  viewer commitment, tier, access scope, policy, expiry, and scoped nullifier
+  without wallet scanning.
+- Add Wallet API preparation and UI review for period payment and creator
+  claims after the escrow end-to-end flow is cleared.
 
 ## Milestone 5 — GigstarkPassport
 
-**Status: Policy model complete; cryptographic verifier planned**
+**Status: Signed proof-receipt verifier complete locally; ZK issuance boundary planned**
 
 - Preserve minimum disclosure, purpose binding, audience binding, expiry, and
   scope-specific replay protection.
-- Specify credential issuance, revocation, proof verification, and verifier
-  governance independently for Starknet.
+- The Cairo verifier supports audience/purpose/credential policies, time bounds,
+  policy revocation, canonical Stark signatures, and scoped nullifier replay
+  protection.
+- Escrow and tier gate consume exact action-bound receipts; adversarial tests
+  cover wrong audience, wrong role/tier, expiry, revocation, and replay.
+- Specify credential issuance, underlying ZK proof verification, attestor key
+  governance/rotation, and operational revocation independently for Starknet.
 - Do not import Athera Passport contracts, code, network trust, or identity
   records.
-- Do not describe the current opaque commitment checker as a ZK proof verifier.
+- Describe the current contract accurately as an attested proof-receipt
+  verifier, not a direct ZK circuit verifier.
 
 ## Milestone 6 — Sepolia release candidate
 
@@ -216,4 +244,5 @@ the only planned recurring-payment mechanism before that review.
 
 See [the architecture boundary](docs/ARCHITECTURE.md) and
 [the STRK20 Sepolia integration pin](contracts/STRK20_SEPOLIA_PIN.md) for the
-supporting design constraints.
+supporting design constraints. The current app-team findings and unresolved
+deployment blockers are tracked in [the internal security review](docs/SECURITY_REVIEW.md).

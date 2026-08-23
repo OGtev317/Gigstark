@@ -1,0 +1,210 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  STRK20_OBSERVED_SEPOLIA_CLASS_HASH,
+  STRK20_REVIEWED_RC0_CLASS_HASH,
+  STRK20_SEPOLIA_POOL_ADDRESS,
+  buildPrivateDepositActions,
+  buildWinnerClaimActions,
+  preparePrivateDeposit,
+  submitPreparedActions,
+  supportsWalletApiVersions,
+  verifyReviewedSepoliaPool,
+  type EscrowDepositInput,
+  type GigstarkPassportProofCalldata,
+  type Strk20WalletAccount,
+  type StarknetPoolProvider,
+} from "../src/lib/strk20-wallet";
+
+const pool = {
+  address: STRK20_SEPOLIA_POOL_ADDRESS,
+  classHash: STRK20_REVIEWED_RC0_CLASS_HASH,
+};
+
+const deposit = (): EscrowDepositInput => ({
+  pool,
+  escrowAddress: "0x123",
+  token: "0x456",
+  amount: 100n,
+  escrowId: "0x789",
+  buyerCommitment: "0xabc",
+  sellerCommitment: "0xdef",
+  deadline: 2_000,
+});
+
+const provider = (classHash: string = STRK20_REVIEWED_RC0_CLASS_HASH): StarknetPoolProvider => ({
+  async getChainId() {
+    return "SN_SEPOLIA";
+  },
+  async getClassHashAt(address, blockIdentifier) {
+    assert.equal(address, STRK20_SEPOLIA_POOL_ADDRESS);
+    assert.equal(blockIdentifier, "latest");
+    return classHash;
+  },
+});
+
+const proof = (): GigstarkPassportProofCalldata => ({
+  policyId: "0x1",
+  audience: "0x123",
+  purpose: 1,
+  credentialClass: "0x2",
+  scopeNullifier: "0x3",
+  proofCommitment: "0x4",
+  issuedAt: 1_900,
+  expiresAt: 1_950,
+  signatureR: "0x5",
+  signatureS: "0x6",
+});
+
+test("detects only Wallet API 0.10.3 or newer without a balance probe", () => {
+  assert.equal(supportsWalletApiVersions(["0.10.2"]), false);
+  assert.equal(supportsWalletApiVersions(["0.10.3"]), true);
+  assert.equal(supportsWalletApiVersions(["0.10.4-rc.1"]), true);
+});
+
+test("private escrow deposit withdraws to the helper before invoking it", () => {
+  const actions = buildPrivateDepositActions(deposit());
+  assert.equal(actions.length, 2);
+  assert.equal(actions[0]?.type, "withdraw");
+  assert.equal(actions[1]?.type, "invoke");
+  if (actions[1]?.type !== "invoke") assert.fail("expected invoke action");
+  assert.equal(actions[1].contract, "0x123");
+  assert.equal(actions[1].calldata.length, 20);
+});
+
+test("winner claim opens exactly one note and passes its placeholder to the helper", () => {
+  const actions = buildWinnerClaimActions({
+    pool,
+    escrowAddress: "0x123",
+    token: "0x456",
+    recipient: "0x999",
+    escrowId: "0x789",
+    winnerRole: "seller",
+    proof: proof(),
+  });
+  assert.equal(actions.length, 2);
+  assert.deepEqual(actions[0], {
+    type: "transfer",
+    token: "0x456",
+    amount: "OPEN",
+    recipient: "0x999",
+  });
+  if (actions[1]?.type !== "invoke") assert.fail("expected invoke action");
+  assert.equal(actions[1].calldata[9], "${openNoteIds[0]}");
+  assert.equal(actions[1].calldata.length, 20);
+});
+
+test("current unmapped Sepolia pool class fails closed", () => {
+  assert.throws(
+    () =>
+      buildPrivateDepositActions({
+        ...deposit(),
+        pool: { address: STRK20_SEPOLIA_POOL_ADDRESS, classHash: STRK20_OBSERVED_SEPOLIA_CLASS_HASH },
+      }),
+    /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+});
+
+test("runtime pool verification rejects wrong chain and the observed unmapped class", async () => {
+  await assert.rejects(
+    verifyReviewedSepoliaPool({
+      ...provider(),
+      async getChainId() {
+        return "SN_MAIN";
+      },
+    }),
+    /STRK20_WRONG_CHAIN/,
+  );
+  await assert.rejects(
+    verifyReviewedSepoliaPool(provider(STRK20_OBSERVED_SEPOLIA_CLASS_HASH)),
+    /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+});
+
+test("preparation simulates without balances or submission and submission stays explicit", async () => {
+  const calls: string[] = [];
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke(actions, simulate) {
+      calls.push(`prepare:${actions.length}:${String(simulate)}`);
+      return { call: "prepared" };
+    },
+    async strk20InvokeTransaction(actions) {
+      calls.push(`submit:${actions.length}`);
+      return { transaction_hash: "0xfeed" };
+    },
+  };
+  const { pool: _pool, ...depositInput } = deposit();
+  await preparePrivateDeposit(account, provider(), depositInput);
+  assert.deepEqual(calls, ["prepare:2:true"]);
+  const result = await submitPreparedActions(
+    account,
+    provider(),
+    buildPrivateDepositActions(deposit()),
+  );
+  assert.equal(result.transaction_hash, "0xfeed");
+  assert.deepEqual(calls, ["prepare:2:true", "submit:2"]);
+});
+
+test("preparation never reaches the wallet when the live class is unreviewed", async () => {
+  let prepared = false;
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke() {
+      prepared = true;
+      return {};
+    },
+    async strk20InvokeTransaction() {
+      throw new Error("NOT_EXPECTED");
+    },
+  };
+  const { pool: _pool, ...depositInput } = deposit();
+  await assert.rejects(
+    preparePrivateDeposit(
+      account,
+      provider(STRK20_OBSERVED_SEPOLIA_CLASS_HASH),
+      depositInput,
+    ),
+    /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+  assert.equal(prepared, false);
+});
+
+test("malformed and overflowing public fields are rejected before wallet preparation", () => {
+  assert.throws(
+    () => buildPrivateDepositActions({ ...deposit(), amount: 1n << 128n }),
+    /INVALID_DEPOSIT_AMOUNT/,
+  );
+  assert.throws(
+    () => buildPrivateDepositActions({ ...deposit(), escrowAddress: "not-a-felt" }),
+    /INVALID_ESCROW_ADDRESS/,
+  );
+  assert.throws(
+    () => buildPrivateDepositActions({ ...deposit(), deadline: 1n << 64n }),
+    /INVALID_DEADLINE/,
+  );
+  assert.throws(
+    () =>
+      buildWinnerClaimActions({
+        pool,
+        escrowAddress: "0x123",
+        token: "0x456",
+        recipient: "0x999",
+        escrowId: "0x789",
+        winnerRole: "seller",
+        proof: { ...proof(), purpose: 256 },
+      }),
+    /INVALID_PROOF_PURPOSE/,
+  );
+  assert.throws(
+    () =>
+      buildWinnerClaimActions({
+        pool,
+        escrowAddress: "0x123",
+        token: "0x456",
+        recipient: "0x999",
+        escrowId: "0x789",
+        winnerRole: "seller",
+        proof: { ...proof(), expiresAt: 1_800 },
+      }),
+    /INVALID_PROOF_TIME_RANGE/,
+  );
+});

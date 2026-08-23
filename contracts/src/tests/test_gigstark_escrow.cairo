@@ -10,14 +10,16 @@ use starkware_utils_testing::test_utils::{
     Deployable, TokenConfig, TokenHelperTrait, assert_panic_with_felt_error,
     cheat_caller_address_once,
 };
+use super::super::gigstark_passport::PASSPORT_PURPOSE_ESCROW_ROLE;
 use super::super::test_contracts::{
     IMockAuthorizationControlDispatcher, IMockAuthorizationControlDispatcherTrait,
 };
 use super::super::{
-    IGigstarkEscrowDispatcher, IGigstarkEscrowDispatcherTrait, IGigstarkEscrowSafeDispatcher,
-    IGigstarkEscrowSafeDispatcherTrait, OP_CLAIM, OP_CONFIRM_DELIVERY, OP_DEPOSIT, OP_OPEN_DISPUTE,
-    OP_SUBMIT_DELIVERY, OP_TIMEOUT, ROLE_BUYER, ROLE_NONE, ROLE_SELLER, STATUS_BUYER_WINS,
-    STATUS_DISPUTED, STATUS_SELLER_WINS, errors,
+    GigstarkPassportProof, IGigstarkEscrowDispatcher, IGigstarkEscrowDispatcherTrait,
+    IGigstarkEscrowSafeDispatcher, IGigstarkEscrowSafeDispatcherTrait, OP_CLAIM,
+    OP_CONFIRM_DELIVERY, OP_DEPOSIT, OP_OPEN_DISPUTE, OP_SUBMIT_DELIVERY, OP_TIMEOUT, ROLE_BUYER,
+    ROLE_NONE, ROLE_SELLER, STATUS_BUYER_WINS, STATUS_DISPUTED, STATUS_SELLER_WINS,
+    empty_gigstark_passport_proof, errors,
 };
 
 const PRIVACY_POOL: felt252 = 'PRIVACY_POOL';
@@ -27,6 +29,14 @@ const SELLER_COMMITMENT: felt252 = 'SELLER_ROLE';
 const ESCROW_ID: felt252 = 'ESCROW_ONE';
 const AMOUNT: u128 = 100;
 const DEADLINE: u64 = 1_000;
+
+fn mock_proof(authorization_digest: felt252) -> GigstarkPassportProof {
+    let mut proof = empty_gigstark_passport_proof();
+    proof.policy_id = 'MOCK_POLICY';
+    proof.purpose = PASSPORT_PURPOSE_ESCROW_ROLE;
+    proof.proof_commitment = authorization_digest;
+    proof
+}
 
 #[derive(Copy, Drop)]
 struct TestContext {
@@ -71,7 +81,7 @@ impl TestContextImpl of TestContextTrait {
         delivery_commitment: felt252,
         deadline: u64,
         note_id: felt252,
-        authorization_digest: felt252,
+        proof: GigstarkPassportProof,
     ) -> Span<OpenNoteDeposit> {
         cheat_caller_address_once(
             contract_address: *self.escrow_address, caller_address: privacy_pool(),
@@ -89,7 +99,7 @@ impl TestContextImpl of TestContextTrait {
                 delivery_commitment,
                 deadline,
                 note_id,
-                authorization_digest,
+                proof,
             )
     }
 
@@ -107,7 +117,7 @@ impl TestContextImpl of TestContextTrait {
                 0,
                 DEADLINE,
                 0,
-                0,
+                empty_gigstark_passport_proof(),
             );
         assert(deposits.is_empty(), 'DEPOSIT_NOT_EMPTY');
     }
@@ -133,7 +143,7 @@ impl TestContextImpl of TestContextTrait {
                 'DELIVERY_HASH',
                 0,
                 0,
-                authorization_digest,
+                mock_proof(authorization_digest),
             );
     }
 }
@@ -200,7 +210,7 @@ fn test_unaccounted_surplus_does_not_inflate_or_block_deposit() {
             0,
             DEADLINE,
             0,
-            0,
+            empty_gigstark_passport_proof(),
         );
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).amount, AMOUNT);
     assert_eq!(
@@ -226,7 +236,7 @@ fn test_wrong_pool_caller_fails() {
             0,
             DEADLINE,
             0,
-            0,
+            empty_gigstark_passport_proof(),
         );
     assert_panic_with_felt_error(:result, expected_error: errors::ONLY_PRIVACY_POOL);
 }
@@ -252,7 +262,7 @@ fn test_deposit_rejects_insufficient_balance() {
             0,
             DEADLINE,
             0,
-            0,
+            empty_gigstark_passport_proof(),
         );
     assert_panic_with_felt_error(:result, expected_error: errors::INSUFFICIENT_ESCROW_BALANCE);
 }
@@ -278,7 +288,7 @@ fn test_unapproved_role_authorization_fails() {
             'DELIVERY_HASH',
             0,
             0,
-            'UNAPPROVED_AUTH',
+            mock_proof('UNAPPROVED_AUTH'),
         );
     assert_panic_with_felt_error(:result, expected_error: errors::ACTION_NOT_AUTHORIZED);
 }
@@ -301,7 +311,7 @@ fn test_seller_win_returns_one_note_and_approves_pool() {
             0,
             0,
             0,
-            'AUTH_CONFIRM',
+            mock_proof('AUTH_CONFIRM'),
         );
     context.authorize(ESCROW_ID, OP_CLAIM, 'SELLER_NOTE', SELLER_COMMITMENT, 'AUTH_CLAIM');
     let deposits = context
@@ -316,7 +326,7 @@ fn test_seller_win_returns_one_note_and_approves_pool() {
             0,
             0,
             'SELLER_NOTE',
-            'AUTH_CLAIM',
+            mock_proof('AUTH_CLAIM'),
         );
     assert_eq!(deposits.len(), 1);
     assert_eq!(
@@ -356,7 +366,7 @@ fn test_replay_and_double_claim_fail() {
             'DELIVERY_HASH',
             0,
             0,
-            'AUTH_DELIVERY',
+            mock_proof('AUTH_DELIVERY'),
         );
     assert_panic_with_felt_error(result: replay, expected_error: errors::INVALID_STATE);
 
@@ -373,12 +383,22 @@ fn test_replay_and_double_claim_fail() {
             0,
             0,
             0,
-            'AUTH_CONFIRM',
+            mock_proof('AUTH_CONFIRM'),
         );
     context.authorize(ESCROW_ID, OP_CLAIM, 'NOTE_ONE', SELLER_COMMITMENT, 'AUTH_ONE');
     context
         .invoke(
-            OP_CLAIM, ESCROW_ID, ROLE_SELLER, Zero::zero(), 0, 0, 0, 0, 0, 'NOTE_ONE', 'AUTH_ONE',
+            OP_CLAIM,
+            ESCROW_ID,
+            ROLE_SELLER,
+            Zero::zero(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            'NOTE_ONE',
+            mock_proof('AUTH_ONE'),
         );
 
     context.authorize(ESCROW_ID, OP_CLAIM, 'NOTE_TWO', SELLER_COMMITMENT, 'AUTH_TWO');
@@ -388,7 +408,17 @@ fn test_replay_and_double_claim_fail() {
     let duplicate = context
         .safe_escrow()
         .privacy_invoke(
-            OP_CLAIM, ESCROW_ID, ROLE_SELLER, Zero::zero(), 0, 0, 0, 0, 0, 'NOTE_TWO', 'AUTH_TWO',
+            OP_CLAIM,
+            ESCROW_ID,
+            ROLE_SELLER,
+            Zero::zero(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            'NOTE_TWO',
+            mock_proof('AUTH_TWO'),
         );
     assert_panic_with_felt_error(result: duplicate, expected_error: errors::DOUBLE_CLAIM);
 }
@@ -401,7 +431,17 @@ fn test_only_arbitrator_resolves_dispute_to_buyer() {
     context.authorize(ESCROW_ID, OP_OPEN_DISPUTE, 0, BUYER_COMMITMENT, 'AUTH_DISPUTE');
     context
         .invoke(
-            OP_OPEN_DISPUTE, ESCROW_ID, ROLE_BUYER, Zero::zero(), 0, 0, 0, 0, 0, 0, 'AUTH_DISPUTE',
+            OP_OPEN_DISPUTE,
+            ESCROW_ID,
+            ROLE_BUYER,
+            Zero::zero(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            mock_proof('AUTH_DISPUTE'),
         );
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).status, STATUS_DISPUTED);
 
@@ -425,7 +465,19 @@ fn test_timeout_requires_expiry() {
     );
     let early = context
         .safe_escrow()
-        .privacy_invoke(OP_TIMEOUT, ESCROW_ID, ROLE_NONE, Zero::zero(), 0, 0, 0, 0, 0, 0, 0);
+        .privacy_invoke(
+            OP_TIMEOUT,
+            ESCROW_ID,
+            ROLE_NONE,
+            Zero::zero(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            empty_gigstark_passport_proof(),
+        );
     assert_panic_with_felt_error(result: early, expected_error: errors::NOT_EXPIRED);
 }
 
@@ -436,7 +488,20 @@ fn test_timeout_refund_returns_one_buyer_note_and_rejects_double_claim() {
     context.deposit();
 
     start_cheat_block_timestamp(context.escrow_address, DEADLINE);
-    context.invoke(OP_TIMEOUT, ESCROW_ID, ROLE_NONE, Zero::zero(), 0, 0, 0, 0, 0, 0, 0);
+    context
+        .invoke(
+            OP_TIMEOUT,
+            ESCROW_ID,
+            ROLE_NONE,
+            Zero::zero(),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            empty_gigstark_passport_proof(),
+        );
     stop_cheat_block_timestamp(context.escrow_address);
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).status, STATUS_BUYER_WINS);
 
@@ -453,7 +518,7 @@ fn test_timeout_refund_returns_one_buyer_note_and_rejects_double_claim() {
             0,
             0,
             'BUYER_NOTE',
-            'AUTH_BUYER',
+            mock_proof('AUTH_BUYER'),
         );
     assert_eq!(deposits.len(), 1);
     assert_eq!(
@@ -480,7 +545,7 @@ fn test_timeout_refund_returns_one_buyer_note_and_rejects_double_claim() {
             0,
             0,
             'BUYER_NOTE_2',
-            'AUTH_BUYER_2',
+            mock_proof('AUTH_BUYER_2'),
         );
     assert_panic_with_felt_error(:result, expected_error: errors::DOUBLE_CLAIM);
 }

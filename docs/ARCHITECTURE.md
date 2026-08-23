@@ -23,7 +23,13 @@ flags. Token and amount are required for settlement and remain observable at
 the helper boundary. No raw identity, wallet address, delivery bytes, evidence,
 viewing key, spending key, or private witness belongs in helper state.
 
-The Wallet API call will use the standard two-action STRK20 pattern: create one open output note, then invoke the helper with that open-note ID. The helper approves the pool to pull the winner's balance and returns exactly one `OpenNoteDeposit`; it never transfers output directly. Amount is observable at the helper boundary and must not be described as hidden.
+The Wallet API draft uses two explicit action shapes. A private deposit is
+`withdraw -> invoke`, which sends the selected private input to the escrow and
+then records it. A winner claim is `open transfer -> invoke`, passing the
+wallet-provided open-note placeholder into the helper. The helper approves the
+pool to pull the winner's balance and returns exactly one `OpenNoteDeposit`; it
+never transfers output directly. Amount is observable at the helper boundary
+and must not be described as hidden.
 
 Required pre-deploy checks:
 
@@ -34,17 +40,26 @@ Required pre-deploy checks:
 5. Independent Cairo/security review and a scoped operational/dispute policy are complete.
 
 The first integration pin is recorded in `contracts/STRK20_SEPOLIA_PIN.md`.
-The project now compiles with the upstream Cairo 2.17.0 toolchain and has a
-non-empty contract artifact plus Starknet Foundry tests. The external action-
-authorization verifier is mocked, and the live Sepolia pool class does not
-currently match the older class hash published for the pinned RC.0 contract
-source, so declaration and deployment remain blocked.
+The project compiles with Cairo 2.17.0 and has non-empty contract artifacts plus
+25 passing Starknet Foundry tests. The live Sepolia pool class does not match
+either of the source-built, reviewed upstream class hashes, so Wallet API
+preparation fails closed and declaration/deployment remain blocked.
+
+Preparation and submission read the current chain ID and pool class through the
+provider immediately before reaching the wallet. A caller cannot unlock the
+flow by passing the reviewed hash as ordinary input while the deployed class is
+different.
 
 ## Second demo: subscriptions and tier proof
 
-`GigstarkSubscriptions` begins with one user-authorized period. It can add no more than three prepaid periods, supports cancellation and expiry, and produces a one-time private creator claim per paid period. It has no autonomous recurring charge mechanism.
+`GigstarkSubscriptions` begins with one user-authorized period. It supports no
+more than three paid periods total, cancellation, expiry, and a one-time private
+creator claim per paid period. Creator claims unlock at payment. It has no
+autonomous recurring charge mechanism.
 
-Tier access is separate from a wallet scan: a verifier checks an audience-bound proof that binds a tier, audience, expiry, and scope-specific anti-replay value. The verifier should receive only the proof outcome necessary to grant access.
+Tier access is separate from a wallet scan. `GigstarkTierGate` consumes an
+audience-bound passport receipt that binds the viewer commitment, exact tier,
+access scope, audience, expiry, credential class, and one scoped nullifier.
 
 ## Passport patterns adapted locally
 
@@ -55,13 +70,26 @@ Gigstark borrows protocol patterns—not code, deployed contracts, trust, or net
 - one anti-replay value scoped to the Gigstark policy; and
 - proof/disclosure digests rather than private witnesses or user identity data.
 
-`src/lib/tier-proof.ts` implements these checks locally and the page exposes a safe simulated verifier. It is **not a ZK verifier**, does not accept a Passport proof, and does not attest any real entitlement. A Starknet proof verifier and issuer model require a separate design/audit before replacing this demo.
+The earlier TypeScript checker remains a browser simulation. The Cairo
+`GigstarkPassportVerifier` now enforces these bindings cryptographically using
+a policy-pinned Stark attestor key and canonical signatures. It verifies an
+attested acceptance receipt, not the underlying ZK proof. Issuance, off-chain
+proof verification, attestor governance, and an independent audit remain open.
 
 ## GigstarkPassport
 
-`src/lib/gigstark-passport.ts` is a separately written Gigstark proof-envelope policy module. It binds an opaque proof commitment to a Gigstark-only policy, credential class, purpose, audience, expiry, nonce, and scope-specific anti-replay value. It stores no source-chain binding, identity, wallet address, witness, document, or amount.
+`contracts/src/gigstark_passport.cairo` is a separately written Gigstark
+proof-receipt verifier. It binds an opaque proof commitment to a Gigstark-only
+policy, credential class, purpose, audience contract, chain, verifier, exact
+action statement, unlinkable role/viewer commitment, validity window, and
+scope-specific nullifier. It stores no identity, wallet address, witness,
+document, or amount.
 
-It does not import or adapt Athera source code, call Athera L1/L3, verify a Groth16 proof, or issue a real credential. Its future ZK issuer/verifier boundary is intentionally unimplemented and requires a Starknet-specific design, audit, and testnet-only review.
+It does not import or adapt Athera source code, call Athera L1/L3, verify a
+Groth16 proof, or issue a credential. It uses only the high-level minimum-
+disclosure, audience-binding, expiry, revocation, and anti-replay patterns. The
+future ZK issuer/verifier boundary requires a Starknet-specific design, audit,
+and testnet-only review.
 
 ## Sources reviewed
 

@@ -22,6 +22,7 @@ pub trait IMockAuthorizationControl<TContractState> {
 #[starknet::contract]
 pub mod MockAuthorizationVerifier {
     use starknet::storage::{StorageMapReadAccess, StorageMapWriteAccess};
+    use super::super::GigstarkPassportProof;
     use super::{IActionAuthorizationVerifier, IMockAuthorizationControl, authorization_key};
 
     #[storage]
@@ -31,15 +32,15 @@ pub mod MockAuthorizationVerifier {
 
     #[abi(embed_v0)]
     impl AuthorizationImpl of IActionAuthorizationVerifier<ContractState> {
-        fn is_authorized(
-            self: @ContractState,
+        fn consume_authorization(
+            ref self: ContractState,
             role_commitment: felt252,
             action_statement: felt252,
-            authorization_digest: felt252,
+            proof: GigstarkPassportProof,
         ) -> bool {
             self
                 .authorizations
-                .read(authorization_key(role_commitment, action_statement, authorization_digest))
+                .read(authorization_key(role_commitment, action_statement, proof.proof_commitment))
         }
     }
 

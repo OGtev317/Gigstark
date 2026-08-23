@@ -34,4 +34,4 @@ casm = true
 casm-add-pythonic-hints = true
 
 [scripts]
-test = "SCARB_IGNORE_CAIRO_VERSION=true snforge test"
+test = "snforge test"
