@@ -1,3 +1,4 @@
+mod test_gigstark_compute_verifier;
 mod test_gigstark_escrow;
 mod test_gigstark_passport;
 mod test_gigstark_subscriptions;

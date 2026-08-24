@@ -8,6 +8,7 @@
     "start": "next start",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "verify:starknet-health": "tsx scripts/verify-starknet-health.ts",
     "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts"
   },
   "dependencies": {

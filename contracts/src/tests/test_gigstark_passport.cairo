@@ -24,7 +24,7 @@ use super::super::{
 };
 
 const PRIVACY_POOL: felt252 = 'PRIVACY_POOL';
-const ARBITRATOR: felt252 = 'ARBITRATOR';
+const COMPUTE_VERIFIER: felt252 = 'COMPUTE_VERIFIER';
 const ADMIN: felt252 = 'PASSPORT_ADMIN';
 const POLICY_ID: felt252 = 'GIGSTARK_ESCROW_POLICY';
 const CREDENTIAL_CLASS: felt252 = 'GIGSTARK_ROLE';
@@ -150,7 +150,7 @@ fn setup() -> PassportContext {
 
     let escrow_class = declare(contract: "GigstarkEscrow").unwrap_syscall().contract_class();
     let (escrow_address, _) = escrow_class
-        .deploy(@array![PRIVACY_POOL, ARBITRATOR, verifier_address.into()])
+        .deploy(@array![PRIVACY_POOL, COMPUTE_VERIFIER, verifier_address.into()])
         .unwrap_syscall();
 
     cheat_caller_address_once(

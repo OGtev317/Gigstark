@@ -4,6 +4,58 @@
 
 Gigstark is a Starknet/STRK20 project. It does not use, call, deploy to, or anchor anything on Athera L1 or L3. The receipt-anchor idea is intentionally deferred; it must not become a pretext for storing identities, amounts, delivery content, or evidence on another chain.
 
+## Strategic center: private, verifiable computation
+
+Gigstark now combines two verification systems with different jobs:
+
+```text
+encrypted evidence + public escrow statement
+                  |
+                  v
+       approved TEE program measurement
+       evaluates private evidence and policy
+                  |
+        attestation commitment + result
+                  |
+                  v
+       ZK policy proof / proof commitment
+                  |
+                  v
+     GigstarkComputeVerifier on Starknet
+   checks exact policy, audience, job, input,
+  expiry, two approvals, and one-use nullifier
+                  |
+                  v
+       GigstarkEscrow outcome -> STRK20 note
+```
+
+The TEE supplies confidentiality during evaluation and a hardware-rooted claim
+about the program measurement. The ZK layer supplies a cryptographic statement
+that the committed input and result satisfy the declared computation policy.
+Neither system receives a STRK20 spending key or viewing key.
+
+The current hackathon contract is intentionally an intermediate boundary. It
+verifies two independent, policy-pinned Stark signatures over the exact same
+compute receipt:
+
+1. A TEE authority key that must be bound to an approved enclave key or a
+   separately validated vendor attestation chain.
+2. A ZK verifier authority key that attests it accepted the opaque proof
+   commitment for the pinned computation policy.
+
+This is stronger than a single operator receipt, but it is not the same as
+directly verifying an AWS Nitro COSE certificate chain or a ZK proof inside the
+Gigstark contract. The long-term replacement is a reviewed attestation-proof
+adapter plus a direct Cairo/Garaga verifier. The receipt statement is designed
+so those verifiers can replace the two authorities without changing escrow job,
+input, result, expiry, or nullifier semantics.
+
+Only commitments are public: program-measurement commitment, policy hash, job
+ID, input/evidence/result commitments, outcome, attestation commitment, proof
+commitment, expiry, and scoped nullifier. Raw evidence, vendor attestation
+documents, model prompts/weights when private, ZK witnesses, identities, and
+wallet private state remain off-chain.
+
 ## First demo: escrow
 
 ```text
@@ -11,7 +63,7 @@ buyer STRK20 wallet
   -> private action: pool withdraws funds to GigstarkEscrow
   -> GigstarkEscrow stores only commitments and settlement state
   -> delivery commitment
-  -> buyer confirmation OR arbitrator outcome OR time-based refund
+  -> buyer confirmation OR TEE+ZK compute outcome OR time-based refund
   -> pool credits exactly one open note
 ```
 
@@ -36,8 +88,12 @@ Required pre-deploy checks:
 1. Exact Sepolia privacy-pool address and ABI are freshly verified.
 2. Wallet capability checks require a supported Wallet API version without asking for private balances as a probe.
 3. `strk20PrepareInvoke` succeeds for every action shape before an actual user submission.
-4. Cairo unit/property tests cover authorization, expiry, duplicate delivery, replays, single settlement, and both double-claim paths.
-5. Independent Cairo/security review and a scoped operational/dispute policy are complete.
+4. Cairo unit/property tests cover authorization, expiry, duplicate delivery,
+   compute-result binding, replays, single settlement, and both double-claim
+   paths.
+5. TEE measurement governance, vendor attestation validation, ZK circuit/public
+   signals, and both authority rotations are independently reviewed.
+6. Independent Cairo/security review and a scoped operational/dispute policy are complete.
 
 The first integration pin is recorded in `contracts/STRK20_SEPOLIA_PIN.md`.
 The project compiles with Cairo 2.17.0 and has non-empty contract artifacts plus
@@ -91,12 +147,50 @@ disclosure, audience-binding, expiry, revocation, and anti-replay patterns. The
 future ZK issuer/verifier boundary requires a Starknet-specific design, audit,
 and testnet-only review.
 
+## GigstarkComputeVerifier
+
+`contracts/src/compute_verifier.cairo` is a clean-room, Starknet-native hybrid
+receipt verifier. A policy pins the audience contract, program-measurement
+commitment, computation-policy hash, validity window, TEE authority Stark key,
+and a distinct ZK verifier Stark key. A receipt binds both approvals to the
+chain, verifier, policy, job, expected input commitment, private-evidence
+commitment, result commitment, binary escrow outcome, vendor-attestation
+commitment, ZK-proof commitment, expiry, and scoped nullifier.
+
+The browser TypeScript model checks the same public structure and replay rules,
+but treats signatures as opaque. Only the Cairo contract performs Stark-curve
+signature verification. No browser simulation is evidence of a real enclave,
+vendor quote, or ZK proof.
+
+Before this verifier can drive an escrow outcome, the project must specify:
+
+- the exact TEE platform and accepted vendor root/collateral policy;
+- reproducible enclave image measurement and release process;
+- nonce/freshness binding and attested enclave public-key binding;
+- the exact ZK circuit or Cairo program and canonical public-signal order;
+- how a direct verifier or independently operated verifier authority is
+  governed, rotated, revoked, and monitored; and
+- encrypted evidence ingestion, deletion, availability, and appeal behavior.
+
 ## Sources reviewed
 
 - The STRK20 privacy repository documents the pool, helper/anonymizer model, and a compatibility matrix. Its published privacy-pool and Ekubo/Vesu helper class hashes are references, not Gigstark deployment approvals.
 - The STRK20 Wallet API route keeps viewing keys, note discovery, proof generation, and submission inside the privacy-enabled user wallet. It requires explicit capability detection and uses an open-note-plus-invoke flow for helper interactions.
+- AWS Nitro Enclaves documents that attestation documents are hypervisor-signed,
+  CBOR/COSE objects containing PCR measurements plus optional nonce, public key,
+  and user data. Debug-mode zero PCRs are not acceptable for cryptographic
+  attestation: <https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html>
+  and <https://docs.aws.amazon.com/enclaves/latest/user/set-up-attestation.html>.
+- Starknet documents both Cairo/STARK provable computation through SHARP and
+  SNARK verification in Cairo contracts. These establish feasible proof paths,
+  not an audit or approval of Gigstark's future circuit:
+  <https://docs.starknet.io/learn/protocol/sharp> and
+  <https://docs.starknet.io/build/starknet-by-example/advanced/verify-proofs>.
 
 ## Non-goals
 
 - No autonomous charges or session authority before a separate key-exposure review.
+- No claim that a dual-signed receipt directly verifies vendor hardware or the
+  underlying ZK proof.
+- No TEE custody of STRK20 spending keys, viewing keys, or wallet note state.
 - No public registry modification, contract deployment, funds, tokens, Athera receipt anchor, or claim of cryptographic amount privacy.

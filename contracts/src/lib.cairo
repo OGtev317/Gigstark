@@ -5,6 +5,7 @@
 
 use privacy::objects::OpenNoteDeposit;
 use starknet::ContractAddress;
+pub mod compute_verifier;
 
 pub mod gigstark_passport;
 pub mod subscriptions;
@@ -29,6 +30,7 @@ pub const STATUS_SELLER_WINS: u8 = 4;
 pub const STATUS_BUYER_WINS: u8 = 5;
 
 pub const ACTION_STATEMENT_DOMAIN: felt252 = 'GIGSTARK_ACTION_V1';
+pub const DISPUTE_INPUT_DOMAIN: felt252 = 'GIGSTARK_DISPUTE_V1';
 
 /// Minimal proof receipt consumed by the Starknet-native GigstarkPassport
 /// verifier. The receipt discloses no identity or witness. Its Stark-curve
@@ -93,12 +95,13 @@ pub trait IActionAuthorizationVerifier<TContractState> {
 pub trait IGigstarkEscrow<TContractState> {
     fn get_escrow(self: @TContractState, escrow_id: felt252) -> EscrowRecord;
     fn get_privacy_pool(self: @TContractState) -> ContractAddress;
-    fn get_arbitrator(self: @TContractState) -> ContractAddress;
+    fn get_compute_verifier(self: @TContractState) -> ContractAddress;
     fn get_authorization_verifier(self: @TContractState) -> ContractAddress;
     fn get_accounted_balance(self: @TContractState, token: ContractAddress) -> u256;
     fn get_action_statement(
         self: @TContractState, escrow_id: felt252, operation: u8, payload: felt252,
     ) -> felt252;
+    fn get_dispute_input_commitment(self: @TContractState, escrow_id: felt252) -> felt252;
 
     /// Pool-only STRK20 entry point. The fixed argument layout keeps Wallet API
     /// calldata deterministic. Arguments unused by an operation must be zero.
@@ -117,17 +120,20 @@ pub trait IGigstarkEscrow<TContractState> {
         proof: GigstarkPassportProof,
     ) -> Span<OpenNoteDeposit>;
 
-    /// Dispute evidence stays off-chain. Only the constructor-pinned
-    /// arbitrator may publish the binary outcome.
-    fn resolve_dispute(ref self: TContractState, escrow_id: felt252, seller_wins: bool);
+    /// Dispute evidence stays off-chain. The constructor-pinned compute
+    /// verifier must consume a dual-approved result bound to this escrow.
+    fn resolve_dispute(
+        ref self: TContractState,
+        escrow_id: felt252,
+        receipt: compute_verifier::GigstarkComputeReceipt,
+    );
 }
 
 pub mod errors {
     pub const ZERO_PRIVACY_POOL: felt252 = 'ZERO_PRIVACY_POOL';
-    pub const ZERO_ARBITRATOR: felt252 = 'ZERO_ARBITRATOR';
+    pub const ZERO_COMPUTE_VERIFIER: felt252 = 'ZERO_COMPUTE_VER';
     pub const ZERO_AUTH_VERIFIER: felt252 = 'ZERO_AUTH_VERIFIER';
     pub const ONLY_PRIVACY_POOL: felt252 = 'ONLY_PRIVACY_POOL';
-    pub const ONLY_ARBITRATOR: felt252 = 'ONLY_ARBITRATOR';
     pub const ZERO_ESCROW_ID: felt252 = 'ZERO_ESCROW_ID';
     pub const ZERO_ROLE_COMMITMENT: felt252 = 'ZERO_ROLE_COMMITMENT';
     pub const SAME_ROLE_COMMITMENT: felt252 = 'SAME_ROLE_COMMITMENT';
@@ -145,6 +151,7 @@ pub mod errors {
     pub const ZERO_AUTHORIZATION: felt252 = 'ZERO_AUTH';
     pub const ACTION_NOT_AUTHORIZED: felt252 = 'ACTION_NOT_AUTH';
     pub const INVALID_PROOF_PURPOSE: felt252 = 'BAD_PROOF_PURPOSE';
+    pub const INVALID_COMPUTE_OUTCOME: felt252 = 'BAD_COMPUTE_OUTCOME';
     pub const INSUFFICIENT_ESCROW_BALANCE: felt252 = 'INSUFFICIENT_BAL';
     pub const ACCOUNTED_BALANCE_UNDERFLOW: felt252 = 'BALANCE_UNDERFLOW';
     pub const DOUBLE_CLAIM: felt252 = 'DOUBLE_CLAIM';
@@ -161,10 +168,16 @@ pub mod GigstarkEscrow {
         StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
         StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_contract_address};
+    use starknet::{
+        ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
+    };
+    use super::compute_verifier::{
+        COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER, GigstarkComputeReceipt,
+        IGigstarkComputeVerifierDispatcher, IGigstarkComputeVerifierDispatcherTrait,
+    };
     use super::gigstark_passport::PASSPORT_PURPOSE_ESCROW_ROLE;
     use super::{
-        ACTION_STATEMENT_DOMAIN, EscrowRecord, GigstarkPassportProof,
+        ACTION_STATEMENT_DOMAIN, DISPUTE_INPUT_DOMAIN, EscrowRecord, GigstarkPassportProof,
         IActionAuthorizationVerifierDispatcher, IActionAuthorizationVerifierDispatcherTrait,
         IGigstarkEscrow, OP_CLAIM, OP_CONFIRM_DELIVERY, OP_DEPOSIT, OP_OPEN_DISPUTE,
         OP_SUBMIT_DELIVERY, OP_TIMEOUT, ROLE_BUYER, ROLE_NONE, ROLE_SELLER, STATUS_ACTIVE,
@@ -175,7 +188,7 @@ pub mod GigstarkEscrow {
     #[storage]
     struct Storage {
         privacy_pool: ContractAddress,
-        arbitrator: ContractAddress,
+        compute_verifier: ContractAddress,
         authorization_verifier: ContractAddress,
         escrows: starknet::storage::Map<felt252, EscrowRecord>,
         accounted_balances: starknet::storage::Map<ContractAddress, u256>,
@@ -229,14 +242,14 @@ pub mod GigstarkEscrow {
     fn constructor(
         ref self: ContractState,
         privacy_pool: ContractAddress,
-        arbitrator: ContractAddress,
+        compute_verifier: ContractAddress,
         authorization_verifier: ContractAddress,
     ) {
         assert(privacy_pool.is_non_zero(), errors::ZERO_PRIVACY_POOL);
-        assert(arbitrator.is_non_zero(), errors::ZERO_ARBITRATOR);
+        assert(compute_verifier.is_non_zero(), errors::ZERO_COMPUTE_VERIFIER);
         assert(authorization_verifier.is_non_zero(), errors::ZERO_AUTH_VERIFIER);
         self.privacy_pool.write(privacy_pool);
-        self.arbitrator.write(arbitrator);
+        self.compute_verifier.write(compute_verifier);
         self.authorization_verifier.write(authorization_verifier);
     }
 
@@ -250,8 +263,8 @@ pub mod GigstarkEscrow {
             self.privacy_pool.read()
         }
 
-        fn get_arbitrator(self: @ContractState) -> ContractAddress {
-            self.arbitrator.read()
+        fn get_compute_verifier(self: @ContractState) -> ContractAddress {
+            self.compute_verifier.read()
         }
 
         fn get_authorization_verifier(self: @ContractState) -> ContractAddress {
@@ -269,6 +282,14 @@ pub mod GigstarkEscrow {
             assert(escrow.status != STATUS_NONE, errors::ESCROW_NOT_FOUND);
             compute_action_statement(
                 escrow_id, operation, escrow.action_nonce, payload, get_contract_address(),
+            )
+        }
+
+        fn get_dispute_input_commitment(self: @ContractState, escrow_id: felt252) -> felt252 {
+            let escrow = self.escrows.read(escrow_id);
+            assert(escrow.status == STATUS_DISPUTED, errors::INVALID_STATE);
+            compute_dispute_input_commitment(
+                escrow_id, escrow, get_contract_address(), get_tx_info().unbox().chain_id,
             )
         }
 
@@ -378,16 +399,30 @@ pub mod GigstarkEscrow {
             }
         }
 
-        fn resolve_dispute(ref self: ContractState, escrow_id: felt252, seller_wins: bool) {
-            assert(get_caller_address() == self.arbitrator.read(), errors::ONLY_ARBITRATOR);
+        fn resolve_dispute(
+            ref self: ContractState, escrow_id: felt252, receipt: GigstarkComputeReceipt,
+        ) {
             let mut escrow = self.escrows.read(escrow_id);
             assert(escrow.status != STATUS_NONE, errors::ESCROW_NOT_FOUND);
             assert(escrow.status == STATUS_DISPUTED, errors::INVALID_STATE);
-            escrow.status = if seller_wins {
-                STATUS_SELLER_WINS
-            } else {
-                STATUS_BUYER_WINS
+            let input_commitment = compute_dispute_input_commitment(
+                escrow_id, escrow, get_contract_address(), get_tx_info().unbox().chain_id,
+            );
+            let verifier = IGigstarkComputeVerifierDispatcher {
+                contract_address: self.compute_verifier.read(),
             };
+            let outcome = verifier.consume_result(escrow_id, input_commitment, receipt);
+            assert(
+                outcome == COMPUTE_OUTCOME_BUYER || outcome == COMPUTE_OUTCOME_SELLER,
+                errors::INVALID_COMPUTE_OUTCOME,
+            );
+            escrow
+                .status =
+                    if outcome == COMPUTE_OUTCOME_SELLER {
+                        STATUS_SELLER_WINS
+                    } else {
+                        STATUS_BUYER_WINS
+                    };
             escrow.action_nonce += 1;
             self.escrows.write(escrow_id, escrow);
             self.emit(EscrowSettled { escrow_id, outcome: escrow.status });
@@ -686,6 +721,23 @@ pub mod GigstarkEscrow {
             [
                 ACTION_STATEMENT_DOMAIN, contract_address.into(), escrow_id, operation.into(),
                 action_nonce.into(), payload,
+            ]
+                .span(),
+        )
+    }
+
+    fn compute_dispute_input_commitment(
+        escrow_id: felt252,
+        escrow: EscrowRecord,
+        contract_address: ContractAddress,
+        chain_id: felt252,
+    ) -> felt252 {
+        core::poseidon::poseidon_hash_span(
+            [
+                DISPUTE_INPUT_DOMAIN, chain_id, contract_address.into(), escrow_id,
+                escrow.buyer_commitment, escrow.seller_commitment, escrow.delivery_commitment,
+                escrow.token.into(), escrow.amount.into(), escrow.deadline.into(),
+                escrow.action_nonce.into(),
             ]
                 .span(),
         )

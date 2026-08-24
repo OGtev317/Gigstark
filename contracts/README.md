@@ -6,8 +6,9 @@ official StarkWare escrow package.
 
 The package builds stateful `GigstarkEscrow` and `GigstarkSubscriptions`
 contracts, a `GigstarkPassportVerifier`, and an audience-bound
-`GigstarkTierGate`. The escrow
-constructor pins the privacy pool, arbitrator, and an external action-
+`GigstarkTierGate`. The package also builds `GigstarkComputeVerifier`, the new
+hybrid TEE+ZK result-verification boundary. The escrow constructor pins the
+privacy pool, compute verifier, and an external action-
 authorization verifier. The pool-only `privacy_invoke` route covers deposit,
 delivery, buyer confirmation, dispute opening, timeout refund, and one winner
 claim. Deposits return an empty span; claims approve the pool and return exactly
@@ -29,6 +30,17 @@ Gigstark code and imports no Athera contract, root, trust, or network state. It
 is a signed receipt verifier for an opaque proof accepted off-chain, not a
 direct ZK circuit verifier.
 
+`GigstarkComputeVerifier` requires two distinct, policy-pinned Stark keys to
+approve the same result statement: one represents a TEE measurement/attestation
+authority, and the other represents a ZK proof verifier. The receipt binds
+chain, verifier, audience, program measurement, computation policy, job,
+expected input, evidence/result commitments, binary outcome, attestation/proof
+commitments, validity, and a one-use nullifier. It verifies both canonical
+signatures; it does not yet parse a vendor certificate/COSE chain or directly
+verify the underlying ZK proof. The escrow now derives an exact dispute-input
+commitment from its state and consumes one compute result to select the buyer or
+seller outcome.
+
 Subscriptions support one initial period, at most three total prepaid periods,
 cancellation, expiry, and one creator note per paid period. Claims unlock when
 the period is paid; cancellation blocks new prepayment but does not claw back
@@ -44,7 +56,7 @@ scarb build
 snforge test
 ```
 
-The dependency lock must remain checked in. Twenty-five contract tests pass
+The dependency lock must remain checked in. Thirty-four contract tests pass
 locally with the pinned toolchain, but this is not a deployment approval.
 
 The exact upstream release, live pool mismatch, and deployment gate are in

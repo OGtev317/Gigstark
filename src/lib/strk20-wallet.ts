@@ -179,6 +179,17 @@ export async function preparePrivateDeposit(
   return account.strk20PrepareInvoke(buildPrivateDepositActions({ ...input, pool }), true);
 }
 
+export async function preparePrivateDepositForReview(
+  account: Strk20WalletAccount,
+  provider: StarknetPoolProvider,
+  input: Omit<EscrowDepositInput, "pool">,
+): Promise<STRK20_ACTION[]> {
+  const pool = await verifyReviewedSepoliaPool(provider);
+  const actions = buildPrivateDepositActions({ ...input, pool });
+  await account.strk20PrepareInvoke(actions, true);
+  return actions;
+}
+
 export async function prepareWinnerClaim(
   account: Strk20WalletAccount,
   provider: StarknetPoolProvider,

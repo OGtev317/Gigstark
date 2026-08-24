@@ -7,6 +7,7 @@ import {
   buildPrivateDepositActions,
   buildWinnerClaimActions,
   preparePrivateDeposit,
+  preparePrivateDepositForReview,
   submitPreparedActions,
   supportsWalletApiVersions,
   verifyReviewedSepoliaPool,
@@ -136,13 +137,21 @@ test("preparation simulates without balances or submission and submission stays 
   const { pool: _pool, ...depositInput } = deposit();
   await preparePrivateDeposit(account, provider(), depositInput);
   assert.deepEqual(calls, ["prepare:2:true"]);
+  const reviewedActions = await preparePrivateDepositForReview(
+    account,
+    provider(),
+    depositInput,
+  );
+  assert.equal(reviewedActions.length, 2);
+  assert.equal(reviewedActions[0]?.type, "withdraw");
+  assert.deepEqual(calls, ["prepare:2:true", "prepare:2:true"]);
   const result = await submitPreparedActions(
     account,
     provider(),
-    buildPrivateDepositActions(deposit()),
+    reviewedActions,
   );
   assert.equal(result.transaction_hash, "0xfeed");
-  assert.deepEqual(calls, ["prepare:2:true", "submit:2"]);
+  assert.deepEqual(calls, ["prepare:2:true", "prepare:2:true", "submit:2"]);
 });
 
 test("preparation never reaches the wallet when the live class is unreviewed", async () => {
@@ -158,7 +167,7 @@ test("preparation never reaches the wallet when the live class is unreviewed", a
   };
   const { pool: _pool, ...depositInput } = deposit();
   await assert.rejects(
-    preparePrivateDeposit(
+    preparePrivateDepositForReview(
       account,
       provider(STRK20_OBSERVED_SEPOLIA_CLASS_HASH),
       depositInput,

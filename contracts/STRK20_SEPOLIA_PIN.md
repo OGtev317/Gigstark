@@ -13,16 +13,28 @@ an SDK release and is not used as the contract dependency pin.
 | Upstream Cairo/Starknet package | `2.17.0` |
 | Required return | `privacy::objects::OpenNoteDeposit` as `Span<OpenNoteDeposit>` |
 | Wallet stack | `starknet@10.4.0`, Wallet API types `0.10.3`, discovery `6.0.2`, wallet standard `6.0.2` |
+| Live-source candidate | `starkware-libs/starknet-privacy@5bf8aae27f9c1aaefa53eea133dc29343ad196ac` |
+| Canonical live ABI SHA-256 | `82048b31b314b22d58ef6c72064ff6ce9ba554ea6b924f9eac7cd032bac9848f` |
 
 ## Read-only Sepolia verification
 
-On 2026-08-23, the recorded endpoint was checked through a public Sepolia RPC:
+On 2026-08-23, two independent public RPC providers were checked with
+`starknet@10.4.0`. The check requires the exact `SN_SEPOLIA` chain ID, accepted
+and recent heads, `syncing: false`, an advancing head on both providers, the
+same hash at a common block, the same class at the pool address, and a
+recomputed Sierra class hash. It also calls the pool's state-dependent views
+and checks the exact V2 invoke ABI surface.
+
+The latest successful run reported:
 
 - chain ID: `SN_SEPOLIA`;
-- observed block: `13938930`;
+- both provider heads advancing;
 - address class hash:
   `0x56ab118a8a6e38efc93ad758cefe909fee421fa931ce3cf72df624d345623b2`;
-- `get_version`: `2.0`.
+- recomputed on-chain Sierra class hash equal to the address class;
+- `get_version`: `2.0`;
+- `get_proof_validity_blocks`: `450`; and
+- `get_upgrade_delay`: `0` seconds.
 
 That live class hash does **not** equal the RC.0 privacy-pool class hash
 `0x52107fadffab71bdcbb6b2ccb68ba3e1b5558d94036538053e159d3076ad633`
@@ -33,14 +45,40 @@ reproduced the published RC.0 class hash. A clean build of the official
 Neither reproducible source class matches the observed Sepolia class. The live
 ABI exposes the expected privacy-pool surface, including `apply_actions`,
 `compile_actions`, and `get_fee_amount`, but no reviewed primary deployment
-record currently maps this Sepolia class back to a source package.
+record currently maps this Sepolia class back to a reproducible source
+artifact.
+
+## Narrowed source candidate
+
+The current class was declared at block `12932191` in transaction
+`0x1139db11de5493f884322d528ec89cf91560eadc52a5ae909d68668451019b7`,
+with compiled class hash
+`0x674605405ee63b71556db1c252e7bcb112babd1b0ea89562aa29ed75111db75`.
+It replaced the pool's official V2 class at block `12932675` in transaction
+`0x59f76fec2b924279e475d94c3b0d01f56cff857dfd730e25e05f1fcfe4344f2`.
+Both receipts succeeded and are accepted on L1.
+
+StarkWare commit `5bf8aae27f9c1aaefa53eea133dc29343ad196ac` merged roughly two
+minutes before the class declaration. Its full 87-item ABI canonically hashes
+to `82048b31...9848f`, exactly matching the live ABI. This is strong evidence
+for the source-level candidate and pins the observed `InvokeExternal`,
+`ComputeAndInvoke`, screening, view, and event shapes.
+
+It is not yet cryptographic source reproduction. With the commit's own Scarb
+2.17.0 lock and repository-defined profiles, a clean dev build produces class
+`0x7af31b...f153c` and a clean release build produces
+`0x261555...9b82`; neither equals `0x56ab...623b2`. Additional inlining-profile
+probes also did not reproduce the live class. This indicates an unpublished
+build-profile, dependency-state, or source difference. The `OpenNoteDeposit`
+definition itself is unchanged between RC.0 and the candidate commit, but that
+fact does not authorize the upgraded pool class.
 
 A local clean-room source survey rebuilt every contract-affecting mainline
 commit from the official screening audit base through current `main`, using
 each commit's pinned Scarb generation (`2.17.0` or `2.18.0`). It also checked
 the relevant public privacy branch tips. None reproduced `0x56ab...623b2`.
-The live ABI includes `ExternalContractInvoked`, which narrows its behavior to
-the later V2-era surface, but ABI similarity is not source provenance.
+The exact ABI match and declaration timeline narrow the candidate further than
+ABI similarity alone, but do not replace artifact reproduction.
 
 ## Compatibility decision
 
@@ -52,10 +90,18 @@ raises `STRK20_POOL_CLASS_UNREVIEWED` before the wallet is called. A live demo
 is blocked until StarkWare publishes or confirms the package/commit that
 produces the observed class, or Gigstark reviews a different exact deployment.
 
-Run `npm run verify:strk20-pool` for a fresh read-only chain/address/class gate.
-The command intentionally exits nonzero while the observed class remains
-unreviewed. A different endpoint can be supplied through
-`GIGSTARK_SEPOLIA_RPC`; no key or account is required.
+Run `npm run verify:starknet-health` for the read-only, two-provider environment
+gate. Run `npm run verify:strk20-pool` for that same health gate plus the
+declaration/activation receipts and source-reproduction decision. The second
+command intentionally exits nonzero while the observed class cannot be
+reproduced. Different endpoints can be supplied through
+`GIGSTARK_SEPOLIA_RPC` and `GIGSTARK_SEPOLIA_RPC_SECONDARY`; no key or account
+is required.
+
+The zero-second pool upgrade delay means class provenance can change without a
+timelock window. A health result is only a point-in-time observation. Gigstark
+must re-read the exact class immediately before preparation and submission and
+must continue to reject any class outside the reviewed allowlist.
 
 The checked-in `.tool-versions` pins Scarb `2.17.0` and Starknet Foundry
 `0.59.0`. The Cairo draft imports only the reviewed `OpenNoteDeposit` type from

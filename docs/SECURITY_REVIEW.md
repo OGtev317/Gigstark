@@ -1,6 +1,6 @@
 # Gigstark internal security review
 
-Last reviewed: 2026-08-23
+Last reviewed: 2026-08-24
 
 This is an app-team review of the local draft, not an independent audit or a
 deployment approval. No contract has been declared or deployed and no wallet
@@ -8,8 +8,8 @@ action or fund movement was performed.
 
 ## Reviewed boundary
 
-- `GigstarkEscrow`, `GigstarkSubscriptions`, `GigstarkPassportVerifier`, and
-  `GigstarkTierGate`;
+- `GigstarkEscrow`, `GigstarkSubscriptions`, `GigstarkPassportVerifier`,
+  `GigstarkComputeVerifier`, and `GigstarkTierGate`;
 - pool-only `privacy_invoke` routing and `OpenNoteDeposit` returns;
 - role, action, purpose, audience, expiry, policy, and nullifier binding;
 - token accounting, exact approvals, claim consumption, cancellation, and
@@ -36,24 +36,49 @@ action or fund movement was performed.
   transaction.
 - TypeScript builders enforce Cairo-sized `u8`, `u64`, and `u128` fields before
   asking a wallet to prove an action.
+- The deposit review screen checks the connected wallet's advertised Starknet
+  Sepolia chain, displays helper/token/amount/deadline fields, dry-runs first,
+  and requires a separate acknowledgement before enabling submission.
+- Wallet rejection and wrong-chain states use fail-closed messages and never
+  imply that a rejected request produced a transaction.
+- Hybrid compute policies require distinct TEE and ZK authority keys. Both
+  canonical Stark signatures cover the same chain, verifier, audience, policy,
+  program measurement, job, input/evidence/result, outcome, attestation/proof
+  commitments, validity, and scoped nullifier.
+- Compute receipts reject either invalid signature, wrong job or expected input,
+  inactive policy, expiry, and nullifier replay.
+- Escrow dispute resolution derives its expected input commitment from the
+  chain, escrow contract, escrow fields, and current action nonce, then consumes
+  exactly one compute result. No direct binary arbitrator call remains.
+- A Starknet SDK health gate compares two Sepolia providers at exact common
+  blocks, requires recent accepted and advancing heads, recomputes the live
+  Sierra class hash, fingerprints the ABI, and calls pool configuration views.
+- The current class declaration and activation blocks and successful receipts
+  are checked independently from the source-reproduction decision.
 
 ## Open deployment blockers
 
-1. **Unmapped STRK20 pool class.** The Sepolia class at the documented pool
-   address is not reproducible from any checked official tag, contract-changing
-   mainline commit, or relevant public privacy branch. Similar ABI shape is not
-   source provenance.
+1. **Unreproduced STRK20 pool class.** The live class's complete ABI and
+   declaration timing match StarkWare commit `5bf8aae`, but the commit's clean
+   dev and release artifacts do not reproduce the live Sierra class hash. The
+   remaining difference is an unpublished build profile, dependency state, or
+   source change; source-level correlation is not artifact provenance.
 2. **Attestor trust.** GigstarkPassport verifies a policy-pinned attestation
    receipt. It does not directly verify the underlying ZK proof. Issuance,
    proof-verifier operation, attestor key storage/rotation, and compromise
    response are not implemented.
-3. **Single administrative roles.** Passport administration and dispute
-   arbitration are constructor-pinned single addresses in this draft. A
-   reviewed multisig/timelock and emergency policy are required before public
-   deployment.
-4. **No independent Cairo audit.** The app-team tests and this review cannot
+3. **TEE and ZK receipts are not directly verified yet.** The new contract
+   verifies two policy-pinned Stark approvals, not an AWS Nitro COSE certificate
+   chain or the underlying ZK proof. Vendor root/collateral validation,
+   reproducible non-debug measurements, nonce freshness, direct proof
+   verification, and independent authority operation remain open.
+4. **Single administrative roles.** Passport and compute policy administration
+   are constructor-pinned single addresses in this draft. A reviewed
+   multisig/timelock, key rotation, revocation, and emergency policy are
+   required before public deployment.
+5. **No independent Cairo audit.** The app-team tests and this review cannot
    replace independent review, property testing, or testnet adversarial drills.
-5. **No live Wallet API E2E.** Ready-wallet proving, rejection, timeout,
+6. **No live Wallet API E2E.** Ready-wallet proving, rejection, timeout,
    relayer, RPC disagreement, note maturity, and transaction-resume behavior
    remain untested.
 
@@ -61,6 +86,14 @@ action or fund movement was performed.
 
 - Helper token, amount, calldata commitments, open-note amounts, timing, and
   the pool/helper interaction remain public.
+- TEE confidentiality depends on the chosen hardware/vendor root, attestation
+  validation, enclave build reproducibility, rollback/freshness controls, and
+  resistance to side channels. A valid signature alone is not hardware proof.
+- ZK correctness depends on the exact circuit/program, verification key, public
+  signal order, proof system, and verifier implementation. Proving the wrong
+  policy correctly is still a system failure.
+- Public compute outcomes and distinctive timing can leak information even when
+  evidence and witnesses remain private.
 - Escrow and subscription identifiers must be unpredictable commitments. A
   guessable identifier permits a funded first-writer denial-of-service attempt.
 - Subscription creator claims unlock when payment is made. Cancellation blocks
@@ -68,13 +101,18 @@ action or fund movement was performed.
 - A single global action nonce per escrow/subscription intentionally serializes
   competing actions. A receipt prepared before another valid action must be
   prepared again.
-- RPC class checks reduce accidental mismatch but still trust the selected RPC
-  response. Release operations should compare multiple independent Sepolia
-  providers and the primary deployment record.
+- The pool currently reports a zero-second upgrade delay. A reviewed class can
+  therefore change without a timelock window, so the class must be checked
+  immediately before both preparation and submission.
+- The release health command compares multiple independent Sepolia providers,
+  but the connected wallet still relies on its selected provider at execution
+  time. Provider disagreement must fail closed.
 
 ## Required next review
 
-Do not declare or deploy until the pool source mapping is published, all
-constructor roles and exact class hashes are reviewed, an independent Cairo
-review closes critical/high findings, and an explicit Sepolia-only transaction
-review authorizes the account, nonce, fees, and constructor calldata.
+Do not declare or deploy until the pool source mapping is published, the exact
+TEE platform/measurement and attestation-validation path are reproducible, the
+ZK circuit/program and verification path are fixed, all constructor roles and
+class hashes are reviewed, an independent Cairo review closes critical/high
+findings, and an explicit Sepolia-only transaction review authorizes the
+account, nonce, fees, and constructor calldata.
