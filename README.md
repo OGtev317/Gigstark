@@ -18,6 +18,9 @@ Athera L1 or L3.
 - A clean-room `GigstarkComputeVerifier` requiring independent TEE and ZK
   approvals over the same audience/job/input/result statement, with expiry,
   revocation, canonical signatures, and nullifier replay protection.
+- A pinned AWS Nitro Enclaves dispute program, a real BN254 Groth16 proof over
+  one synthetic seller-winning dispute, and a Garaga `1.1.0` Cairo verifier
+  whose tests accept the exact eight public signals and reject tampering.
 - A Wallet API preparation layer for private `withdraw -> invoke` deposits and
   `open transfer -> invoke` winner claims, guarded by exact pool address and
   class checks.
@@ -49,6 +52,8 @@ npm run typecheck
 npm run build
 npm run verify:starknet-health
 npm run verify:strk20-pool # expected to fail closed until source reproduction
+npm run proof:verify
+# npm run compute:verify requires Scarb 2.17.0 and snforge 0.59.0
 npm run dev
 ```
 
@@ -60,10 +65,12 @@ Open `http://localhost:3000`.
 pool-only `privacy_invoke`, balance accounting, cryptographic receipt-based role
 authorization, hybrid compute resolution, bounded prepaid subscriptions, tier
 proof consumption, and one reviewed `OpenNoteDeposit` return per valid claim.
-Thirty-four contract tests run locally, but independent review, issuer/attestor
-governance, TEE measurement and attestation operations, direct ZK proof
-verification, live Wallet API execution, and the live pool's upgraded
-class artifact reproduction remain unresolved. The live ABI and declaration
+Thirty-four escrow-package contract tests run locally. A separate generated
+Garaga verifier now validates the synthetic dispute proof on a read-only
+Sepolia fork, but it is not yet wired into escrow settlement. Independent
+review, production proving setup, Nitro EIF measurement and attestation,
+issuer/attestor governance, live Wallet API execution, and the live pool's
+upgraded class artifact reproduction remain unresolved. The live ABI and declaration
 timeline now narrow the source candidate to StarkWare commit `5bf8aae`, but its
 repository-defined build profiles do not reproduce the on-chain class hash.
 Independent security review and fresh network verification are required before
@@ -71,6 +78,8 @@ any declaration or deployment.
 
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
 Track implementation status and release gates in the dedicated [Gigstark roadmap](ROADMAP.md).
+Review the [compute specimen](compute/README.md) and its explicit hardware and
+test-ceremony boundaries before treating it as deployable.
 Review the explicit trust assumptions and blockers in the
 [internal security review](docs/SECURITY_REVIEW.md); it is not an independent audit.
 

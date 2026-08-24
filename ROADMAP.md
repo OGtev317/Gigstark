@@ -219,7 +219,7 @@ moving production funds.
 
 ## Milestone 5 — hybrid TEE + ZK verifiable compute
 
-**Status: Dual-receipt verifier and escrow consumption complete locally; enclave/proof integration in progress**
+**Status: Real proof/Cairo specimen complete locally; Nitro hardware attestation and escrow wiring remain**
 
 - `GigstarkComputeVerifier` pins the audience, program-measurement commitment,
   computation-policy hash, validity window, TEE authority, and a distinct ZK
@@ -231,16 +231,20 @@ moving production funds.
   bad ZK approval, wrong audience/job/input, expiry, and policy revocation.
 - The TypeScript model covers public binding and replay only; it does not claim
   to verify signatures, hardware quotes, or proofs.
-- Select and pin the exact TEE platform. For AWS Nitro, document accepted PCRs,
-  non-debug mode, certificate/collateral validation, nonce freshness, and the
-  attested enclave public-key binding.
-- Define a canonical dispute computation and public signals. At minimum bind
+- AWS Nitro Enclaves and Nitro CLI `1.5.0` are pinned. The static Rust
+  `linux/amd64` container, non-debug EIF recipe, PCR checks, nonce freshness,
+  certificate-chain requirements, and attested public-key boundary are
+  documented. A real EIF/PCR/attestation still requires a Linux Nitro host.
+- The canonical synthetic dispute computation and eight-signal Groth16
+  statement are implemented. The production statement must additionally bind
   chain, compute verifier, escrow audience, policy, program measurement, escrow
   ID, action nonce, role/delivery commitments, evidence root, outcome, result
   commitment, and expiry.
-- Replace the ZK verifier authority with a reviewed direct Cairo/Garaga verifier
-  when the circuit, proving system, verification key, calldata limits, and test
-  vectors are stable.
+- A Garaga `1.1.0` direct Cairo verifier accepts the real BN254 Groth16 fixture
+  and rejects a tampered public signal on a read-only Sepolia fork. Its current
+  deterministic local ceremony and placeholder dispute identifiers are
+  test-only; review, a production setup, calldata limits, and escrow integration
+  remain required before replacing the ZK receipt authority.
 - `GigstarkEscrow.resolve_dispute` derives the expected input commitment from
   chain, contract, escrow state, and action nonce, consumes exactly one compute
   result, and maps its outcome to the buyer or seller.

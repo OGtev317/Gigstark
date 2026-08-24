@@ -11,3 +11,8 @@ CONVERSATION*.md
 *.session
 *.log
 *.tsbuildinfo
+compute/enclave/artifacts/
+compute/zk/build/
+*.eif
+*.ptau
+*.zkey

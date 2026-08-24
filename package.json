@@ -8,6 +8,9 @@
     "start": "next start",
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
+    "proof:build": "bash compute/zk/scripts/build-proof.sh",
+    "proof:verify": "bash compute/zk/scripts/verify-fixture.sh",
+    "compute:verify": "bash compute/verify-specimen.sh",
     "verify:starknet-health": "tsx scripts/verify-starknet-health.ts",
     "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts"
   },
@@ -24,10 +27,15 @@
     "@types/node": "24.10.2",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",
+    "circomlib": "2.0.5",
+    "snarkjs": "0.7.6",
     "tsx": "4.23.12",
     "typescript": "5.9.3"
   },
   "engines": {
     "node": ">=24"
+  },
+  "overrides": {
+    "underscore": "1.13.8"
   }
 }
