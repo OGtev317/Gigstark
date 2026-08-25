@@ -66,6 +66,7 @@ npm run build
 npm run verify:starknet-health
 npm run verify:strk20-pool # expected to fail closed until source reproduction
 npm run verify:strk20-mainnet # read-only Mainnet V2 health and class gate
+npm run review:mainnet-deployment # expected to fail until public review inputs are complete
 npm run proof:verify
 # npm run compute:verify requires Scarb 2.17.0 and snforge 0.59.0
 npm run dev

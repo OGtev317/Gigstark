@@ -5,6 +5,7 @@ target/
 .env
 .env.*
 !.env.example
+release/gigstark-mainnet-deployment-inputs.local.json
 .codex/
 CHAT*.md
 CONVERSATION*.md

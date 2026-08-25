@@ -127,6 +127,11 @@ action or fund movement was performed.
 - The release health commands compare separately configured providers, but the
   connected wallet still relies on its selected provider at execution time.
   Provider disagreement must fail closed.
+- The no-broadcast deployment-readiness command binds an independent approval
+  to the exact compiled contract source commit, verifies the Mainnet manifest
+  hash, rejects secret, viewing-key, spending-key, and witness fields, and
+  requires explicit public governance, prover, attestor, deployer, and fee
+  inputs. A passing review still cannot broadcast.
 
 ## Required next review
 

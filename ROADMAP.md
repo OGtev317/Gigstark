@@ -313,13 +313,16 @@ revocation, and replay must fail. Oyster failure must not change ZK settlement.
 - Describe the current contract accurately as an attested proof-receipt
   verifier, not a direct ZK circuit verifier.
 
-## Milestone 7 — Sepolia release candidate
+## Milestone 7 — Mainnet release candidate
 
-**Status: Planned; no deployment authorized**
+**Status: In progress; no deployment authorized**
 
 - Complete independent contract, wallet, and privacy reviews.
-- Verify current Sepolia chain identity, pool deployment, ABI, class hash, and
+- Verify current Mainnet chain identity, pool deployment, ABI, class hash, and
   supported wallet versions immediately before any declaration or deployment.
+- Complete the no-broadcast Mainnet deployment-input review with the exact
+  independent-review commit, multisig/timelock, production verifier artifacts,
+  public attestor key, deployer account, and maximum total fee.
 - Document TEE measurement governance, ZK verifier governance, human appeal,
   dispute timing, upgrade policy, emergency response, and user-visible privacy
   limitations.
@@ -339,8 +342,8 @@ the only planned recurring-payment mechanism before that review.
 
 ## Release invariants
 
-- No mainnet deployment or production fund movement is implied by a local
-  build, test, declaration, or Sepolia result.
+- No Mainnet deployment or production fund movement is implied by a local
+  build, test, review manifest, or read-only health result.
 - No Athera L1/L3 contract, receipt anchor, registry edit, or cross-chain trust
   dependency is part of the current Gigstark release path.
 - No identity or evidence content is placed in public contract state. Helper
