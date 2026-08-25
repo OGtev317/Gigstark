@@ -193,6 +193,10 @@ Declaration and deployment are not part of this milestone.
   displays the exact public settlement boundary, dry-runs before submission,
   and requires an explicit acknowledgement before enabling the wallet signature
   request.
+- The winner-claim review uses the connected winner as the open-note recipient,
+  displays the exact helper, token, role, and action-bound Passport receipt,
+  dry-runs `open transfer -> invoke`, and requires a separate acknowledgement
+  before its signature request.
 - Wrong-chain, wallet-rejection, and submit-control UI states are covered by
   deterministic tests. Rejections state that nothing was submitted.
 - Preparation and submission query the provider for the current chain ID and
@@ -202,8 +206,8 @@ Declaration and deployment are not part of this milestone.
 
 Remaining:
 
-- Add the winner-claim review screen after an escrow helper address and the live
-  pool source mapping are approved.
+- Obtain an independently reviewed and deployed Sepolia escrow helper address,
+  configure its Passport policy, and resolve the live pool source mapping.
 - Execute a reviewed Sepolia flow only after the live pool source mapping is
   resolved.
 

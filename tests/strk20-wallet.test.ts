@@ -8,13 +8,14 @@ import {
   buildWinnerClaimActions,
   preparePrivateDeposit,
   preparePrivateDepositForReview,
+  prepareWinnerClaimForReview,
   submitPreparedActions,
   supportsWalletApiVersions,
   verifyReviewedSepoliaPool,
   type EscrowDepositInput,
   type GigstarkPassportProofCalldata,
+  type StarknetEscrowProvider,
   type Strk20WalletAccount,
-  type StarknetPoolProvider,
 } from "../src/lib/strk20-wallet";
 
 const pool = {
@@ -33,7 +34,14 @@ const deposit = (): EscrowDepositInput => ({
   deadline: 2_000,
 });
 
-const provider = (classHash: string = STRK20_REVIEWED_RC0_CLASS_HASH): StarknetPoolProvider => ({
+const DEFAULT_ESCROW_RECORD = [
+  "0xabc", "0xdef", "0x777", "0x456", "0x64", "0x800", "0x4", "0x0", "0x0", "0x3",
+];
+
+const provider = (
+  classHash: string = STRK20_REVIEWED_RC0_CLASS_HASH,
+  escrowRecord: readonly string[] = DEFAULT_ESCROW_RECORD,
+): StarknetEscrowProvider => ({
   async getChainId() {
     return "SN_SEPOLIA";
   },
@@ -41,6 +49,13 @@ const provider = (classHash: string = STRK20_REVIEWED_RC0_CLASS_HASH): StarknetP
     assert.equal(address, STRK20_SEPOLIA_POOL_ADDRESS);
     assert.equal(blockIdentifier, "latest");
     return classHash;
+  },
+  async callContract(call, blockIdentifier) {
+    assert.equal(call.contractAddress, "0x123");
+    assert.equal(call.entrypoint, "get_escrow");
+    assert.deepEqual(call.calldata, ["0x789"]);
+    assert.equal(blockIdentifier, "latest");
+    return escrowRecord;
   },
 });
 
@@ -55,6 +70,15 @@ const proof = (): GigstarkPassportProofCalldata => ({
   expiresAt: 1_950,
   signatureR: "0x5",
   signatureS: "0x6",
+});
+
+const claim = () => ({
+  escrowAddress: "0x123",
+  token: "0x456",
+  recipient: "0x999",
+  escrowId: "0x789",
+  winnerRole: "seller" as const,
+  proof: proof(),
 });
 
 test("detects only Wallet API 0.10.3 or newer without a balance probe", () => {
@@ -152,6 +176,23 @@ test("preparation simulates without balances or submission and submission stays 
   );
   assert.equal(result.transaction_hash, "0xfeed");
   assert.deepEqual(calls, ["prepare:2:true", "prepare:2:true", "submit:2"]);
+
+  const claimReview = await prepareWinnerClaimForReview(account, provider(), claim());
+  const claimActions = claimReview.actions;
+  assert.equal(claimReview.publicAmount, "100");
+  assert.equal(claimActions.length, 2);
+  assert.deepEqual(claimActions[0], {
+    type: "transfer",
+    token: "0x456",
+    amount: "OPEN",
+    recipient: "0x999",
+  });
+  assert.deepEqual(calls, [
+    "prepare:2:true",
+    "prepare:2:true",
+    "submit:2",
+    "prepare:2:true",
+  ]);
 });
 
 test("preparation never reaches the wallet when the live class is unreviewed", async () => {
@@ -173,6 +214,47 @@ test("preparation never reaches the wallet when the live class is unreviewed", a
       depositInput,
     ),
     /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+  assert.equal(prepared, false);
+  await assert.rejects(
+    prepareWinnerClaimForReview(
+      account,
+      provider(STRK20_OBSERVED_SEPOLIA_CLASS_HASH),
+      claim(),
+    ),
+    /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+  assert.equal(prepared, false);
+});
+
+test("winner-note review rejects mismatched or consumed escrow state before the wallet", async () => {
+  let prepared = false;
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke() {
+      prepared = true;
+      return {};
+    },
+    async strk20InvokeTransaction() {
+      throw new Error("NOT_EXPECTED");
+    },
+  };
+  const tokenMismatch = [...DEFAULT_ESCROW_RECORD];
+  tokenMismatch[3] = "0x999";
+  await assert.rejects(
+    prepareWinnerClaimForReview(account, provider(undefined, tokenMismatch), claim()),
+    /ESCROW_TOKEN_MISMATCH/,
+  );
+  const winnerMismatch = [...DEFAULT_ESCROW_RECORD];
+  winnerMismatch[6] = "0x5";
+  await assert.rejects(
+    prepareWinnerClaimForReview(account, provider(undefined, winnerMismatch), claim()),
+    /ESCROW_WINNER_MISMATCH/,
+  );
+  const alreadyClaimed = [...DEFAULT_ESCROW_RECORD];
+  alreadyClaimed[7] = "0x1";
+  await assert.rejects(
+    prepareWinnerClaimForReview(account, provider(undefined, alreadyClaimed), claim()),
+    /ESCROW_ALREADY_CLAIMED/,
   );
   assert.equal(prepared, false);
 });

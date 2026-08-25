@@ -30,8 +30,9 @@ Athera L1 or L3.
   `open transfer -> invoke` winner claims, guarded by exact pool address and
   class checks.
 - A browser review flow that detects capability without balance access, checks
-  the connected wallet network, dry-runs the exact deposit actions, and enables
-  an explicit signature request only after user acknowledgement.
+  the connected wallet network, dry-runs the exact deposit and winner-note
+  actions, and enables each explicit signature request only after separate user
+  acknowledgement.
 - A safe product boundary: Gigstark never requests or stores a private key,
   viewing key, private note, or private witness.
 
@@ -75,14 +76,21 @@ verifier validates the synthetic dispute proof on a read-only Sepolia fork and
 now drives the real `GigstarkComputeVerifier` in an integration test. Independent
 review, production proving setup, an Oyster image/attestation receipt,
 issuer/attestor governance, live Wallet API execution, and the live pool's
-upgraded class artifact reproduction remain unresolved. The live ABI and declaration
-timeline now narrow the source candidate to StarkWare commit `5bf8aae`, but its
-repository-defined build profiles do not reproduce the on-chain class hash.
+upgraded class source provenance remain unresolved. The live ABI and onchain
+Sierra/CASM pair reproduce exactly, and the declaration timeline narrows the
+source candidate to StarkWare commit `5bf8aae`, but its repository-defined build
+profiles do not reproduce the on-chain class hash.
 The interface itself is exactly mapped to
 `@starkware-libs/starknet-privacy-sdk@0.14.3-rc.5`; that ABI-level result does
-not unlock live submission without the matching Sierra and CASM artifacts.
+not unlock live submission without the matching reviewed Cairo source tree,
+lockfile, and effective build profile.
 Independent security review and fresh network verification are required before
 any declaration or deployment.
+
+`npm run verify:strk20-artifacts` uses an already-installed exact compiler when
+available. On Intel or Apple Silicon macOS it otherwise downloads the official
+`universal-sierra-compiler 2.8.0` release into a temporary directory and verifies
+its pinned SHA-256 digest before execution.
 
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
 Track implementation status and release gates in the dedicated [Gigstark roadmap](ROADMAP.md).

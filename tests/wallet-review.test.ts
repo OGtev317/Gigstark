@@ -50,6 +50,13 @@ test("wallet rejection UI does not imply that a transaction was submitted", () =
   );
 });
 
+test("winner-state mismatch UI confirms that no claim was submitted", () => {
+  assert.equal(
+    walletFlowErrorMessage(new Error("ESCROW_WINNER_MISMATCH")),
+    "The onchain escrow token, winner, amount, or claim state does not match this review. Nothing was submitted.",
+  );
+});
+
 test("submission stays disabled until dry-run preparation and acknowledgement", () => {
   assert.deepEqual(walletReviewControls("connected", false), {
     canPrepare: true,

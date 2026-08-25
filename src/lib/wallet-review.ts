@@ -60,6 +60,9 @@ export function walletFlowErrorMessage(error: unknown): string {
   if (message.includes("STRK20_POOL_ADDRESS_MISMATCH")) {
     return "The STRK20 pool address does not match the reviewed Sepolia configuration.";
   }
+  if (message.includes("ESCROW_")) {
+    return "The onchain escrow token, winner, amount, or claim state does not match this review. Nothing was submitted.";
+  }
   if (message.includes("WALLET_API_UNSUPPORTED")) {
     return "The selected wallet does not support the required STRK20 Wallet API version.";
   }

@@ -9,7 +9,9 @@ import {
   STRK20_WALLET_API_MIN_VERSION,
   detectStrk20WalletApi,
   preparePrivateDepositForReview,
+  prepareWinnerClaimForReview,
   submitPreparedActions,
+  type GigstarkPassportProofCalldata,
 } from "../lib/strk20-wallet";
 import {
   requireSepoliaWalletAccount,
@@ -305,9 +307,203 @@ export function WalletCapability() {
           The current observed Sepolia pool class is still fail-closed because its source build has
           not reproduced the deployed class hash. This screen cannot bypass that gate.
         </p>
+        <WinnerClaimReview account={account} />
       </div>
     </section>
   );
+}
+
+type ClaimFields = {
+  escrowAddress: string;
+  token: string;
+  escrowId: string;
+  winnerRole: "buyer" | "seller";
+  proofJson: string;
+};
+
+const EMPTY_CLAIM: ClaimFields = {
+  escrowAddress: "",
+  token: "",
+  escrowId: "",
+  winnerRole: "seller",
+  proofJson: "",
+};
+
+function WinnerClaimReview({ account }: { account: WalletAccountV6 | null }) {
+  const [fields, setFields] = useState<ClaimFields>(EMPTY_CLAIM);
+  const [phase, setPhase] = useState<WalletReviewPhase>("disconnected");
+  const [preparedActions, setPreparedActions] = useState<STRK20_ACTION[] | null>(null);
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [flowMessage, setFlowMessage] = useState(
+    "Connect the winning wallet before preparing its private note.",
+  );
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [publicAmount, setPublicAmount] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPreparedActions(null);
+    setAcknowledged(false);
+    setTransactionHash(null);
+    setPublicAmount(null);
+    if (account) {
+      setPhase("connected");
+      setFlowMessage("Winning wallet connected. No private balance or note data was requested.");
+    } else {
+      setPhase("disconnected");
+      setFlowMessage("Connect the winning wallet before preparing its private note.");
+    }
+  }, [account]);
+
+  function updateField<Field extends keyof ClaimFields>(field: Field, value: ClaimFields[Field]) {
+    setFields((current) => ({ ...current, [field]: value }));
+    setPreparedActions(null);
+    setAcknowledged(false);
+    setTransactionHash(null);
+    setPublicAmount(null);
+    if (account) setPhase("connected");
+  }
+
+  async function prepareClaim() {
+    if (!account) return;
+    setPhase("preparing");
+    setFlowMessage("Checking Sepolia and running the winner-note wallet dry run…");
+    try {
+      const provider = new RpcProvider({ nodeUrl: SEPOLIA_RPC });
+      const review = await prepareWinnerClaimForReview(account, provider, {
+        escrowAddress: fields.escrowAddress,
+        token: fields.token,
+        recipient: account.address,
+        escrowId: fields.escrowId,
+        winnerRole: fields.winnerRole,
+        proof: parsePassportProof(fields.proofJson),
+      });
+      setPreparedActions(review.actions);
+      setPublicAmount(review.publicAmount);
+      setAcknowledged(false);
+      setPhase("prepared");
+      setFlowMessage(
+        "Winner-note dry run prepared. Review the connected recipient and public open-note amount before signing.",
+      );
+    } catch (error) {
+      setPreparedActions(null);
+      setPublicAmount(null);
+      setAcknowledged(false);
+      setPhase("blocked");
+      setFlowMessage(walletFlowErrorMessage(error));
+    }
+  }
+
+  async function requestClaimSignature() {
+    if (!account || !preparedActions || !acknowledged) return;
+    setPhase("submitting");
+    setFlowMessage("Waiting for the explicit winner-note wallet signature request…");
+    try {
+      const provider = new RpcProvider({ nodeUrl: SEPOLIA_RPC });
+      const result = await submitPreparedActions(account, provider, preparedActions);
+      setTransactionHash(result.transaction_hash);
+      setPhase("submitted");
+      setFlowMessage("The wallet submitted the reviewed winner-note transaction.");
+    } catch (error) {
+      setTransactionHash(null);
+      setPhase("blocked");
+      setFlowMessage(walletFlowErrorMessage(error));
+    }
+  }
+
+  const controls = walletReviewControls(phase, acknowledged);
+
+  return (
+    <div className="wallet-result">
+      <p className="eyebrow">Private winner-note review</p>
+      <h3>Open exactly one note for the winner</h3>
+      <p>
+        The wallet creates one open note and invokes the escrow claim atomically. Its amount and
+        timing are public. The signed Passport receipt is public authorization data; never paste a
+        viewing key, spending key, seed phrase, or private witness here.
+      </p>
+      <div className="review-grid">
+        <ReviewField label="Escrow helper" value={fields.escrowAddress} onChange={(value) => updateField("escrowAddress", value.trim())} placeholder="0x…" />
+        <ReviewField label="Token" value={fields.token} onChange={(value) => updateField("token", value.trim())} placeholder="0x…" />
+        <ReviewField label="Escrow ID" value={fields.escrowId} onChange={(value) => updateField("escrowId", value.trim())} placeholder="Non-zero felt" />
+        <label className="wallet-select">
+          Winner role
+          <select
+            value={fields.winnerRole}
+            onChange={(event) => updateField("winnerRole", event.target.value as "buyer" | "seller")}
+          >
+            <option value="seller">Seller</option>
+            <option value="buyer">Buyer</option>
+          </select>
+        </label>
+        <ReviewField
+          label="Action-bound GigstarkPassport receipt JSON"
+          value={fields.proofJson}
+          onChange={(value) => updateField("proofJson", value)}
+          placeholder='{"policyId":"0x…","audience":"0x…","purpose":"1","credentialClass":"0x…","scopeNullifier":"0x…","proofCommitment":"0x…","issuedAt":"0","expiresAt":"0","signatureR":"0x…","signatureS":"0x…"}'
+        />
+      </div>
+      <dl className="review-facts">
+        <div><dt>Network</dt><dd>Starknet Sepolia</dd></div>
+        <div><dt>Recipient</dt><dd>{account?.address ?? "Connect winning wallet"}</dd></div>
+        <div><dt>Public amount</dt><dd>{publicAmount ?? "Available after dry run"}</dd></div>
+        <div><dt>Action</dt><dd>Open note → escrow claim invoke</dd></div>
+        <div><dt>Output</dt><dd>Exactly one pool-pulled OpenNoteDeposit</dd></div>
+      </dl>
+      <div className="review-controls">
+        <button type="button" onClick={prepareClaim} disabled={!account || !controls.canPrepare}>
+          {phase === "preparing" ? "Preparing…" : "Run winner-note dry run"}
+        </button>
+        <label className="review-acknowledgement">
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            disabled={phase !== "prepared"}
+            onChange={(event) => setAcknowledged(event.target.checked)}
+          />
+          I reviewed the winner wallet, helper, token, role, receipt, and public open-note boundary.
+        </label>
+        <button type="button" onClick={requestClaimSignature} disabled={!controls.canSubmit}>
+          {phase === "submitting" ? "Requesting…" : "Request winner-note signature"}
+        </button>
+      </div>
+      <p className="wallet-flow-status" role="status">{flowMessage}</p>
+      {transactionHash ? (
+        <p className="wallet-result">
+          Submitted hash: <a href={`https://sepolia.voyager.online/tx/${transactionHash}`} target="_blank" rel="noreferrer">{transactionHash}</a>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function parsePassportProof(value: string): GigstarkPassportProofCalldata {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error("INVALID_PASSPORT_PROOF_JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("INVALID_PASSPORT_PROOF_JSON");
+  }
+  const proof = parsed as Record<string, unknown>;
+  return {
+    policyId: requireProofValue(proof.policyId),
+    audience: requireProofValue(proof.audience),
+    purpose: requireProofValue(proof.purpose),
+    credentialClass: requireProofValue(proof.credentialClass),
+    scopeNullifier: requireProofValue(proof.scopeNullifier),
+    proofCommitment: requireProofValue(proof.proofCommitment),
+    issuedAt: requireProofValue(proof.issuedAt),
+    expiresAt: requireProofValue(proof.expiresAt),
+    signatureR: requireProofValue(proof.signatureR),
+    signatureS: requireProofValue(proof.signatureS),
+  };
+}
+
+function requireProofValue(value: unknown): string {
+  if (typeof value === "string") return value;
+  throw new Error("INVALID_PASSPORT_PROOF_JSON");
 }
 
 function ReviewField({

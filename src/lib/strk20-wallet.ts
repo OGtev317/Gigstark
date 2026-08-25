@@ -51,6 +51,13 @@ export type StarknetPoolProvider = {
   getClassHashAt(contractAddress: string, blockIdentifier?: "latest"): Promise<string>;
 };
 
+export type StarknetEscrowProvider = StarknetPoolProvider & {
+  callContract(
+    call: { contractAddress: string; entrypoint: string; calldata: string[] },
+    blockIdentifier?: "latest",
+  ): Promise<readonly string[]>;
+};
+
 export type EscrowDepositInput = {
   pool: ReviewedPool;
   escrowAddress: FeltInput;
@@ -197,6 +204,48 @@ export async function prepareWinnerClaim(
 ): Promise<unknown> {
   const pool = await verifyReviewedSepoliaPool(provider);
   return account.strk20PrepareInvoke(buildWinnerClaimActions({ ...input, pool }), true);
+}
+
+export async function prepareWinnerClaimForReview(
+  account: Strk20WalletAccount,
+  provider: StarknetEscrowProvider,
+  input: Omit<EscrowClaimInput, "pool">,
+): Promise<{ actions: STRK20_ACTION[]; publicAmount: string }> {
+  const pool = await verifyReviewedSepoliaPool(provider);
+  const actions = buildWinnerClaimActions({ ...input, pool });
+  const escrowAddress = requireAddress(input.escrowAddress, "INVALID_ESCROW_ADDRESS");
+  const escrowId = requireFelt(input.escrowId, "INVALID_ESCROW_ID");
+  const token = requireAddress(input.token, "INVALID_TOKEN_ADDRESS");
+  const record = await provider.callContract(
+    { contractAddress: escrowAddress, entrypoint: "get_escrow", calldata: [escrowId] },
+    "latest",
+  );
+  if (record.length !== 10) throw new Error("INVALID_ESCROW_RECORD");
+  const recordToken = record[3];
+  const recordAmount = record[4];
+  const recordStatus = record[6];
+  const claimed = input.winnerRole === "seller" ? record[7] : record[8];
+  if (!recordToken || !sameFelt(recordToken, token)) throw new Error("ESCROW_TOKEN_MISMATCH");
+  let amountValue: bigint;
+  let statusValue: bigint;
+  let claimedValue: bigint;
+  try {
+    amountValue = BigInt(recordAmount ?? "");
+    statusValue = BigInt(recordStatus ?? "");
+    claimedValue = BigInt(claimed ?? "");
+  } catch {
+    throw new Error("INVALID_ESCROW_RECORD");
+  }
+  if (amountValue <= 0n || amountValue > MAX_U128) {
+    throw new Error("INVALID_ESCROW_AMOUNT");
+  }
+  const expectedStatus = input.winnerRole === "seller" ? 4n : 5n;
+  if (statusValue !== expectedStatus) {
+    throw new Error("ESCROW_WINNER_MISMATCH");
+  }
+  if (claimedValue !== 0n) throw new Error("ESCROW_ALREADY_CLAIMED");
+  await account.strk20PrepareInvoke(actions, true);
+  return { actions, publicAmount: amountValue.toString() };
 }
 
 export async function submitPreparedActions(
