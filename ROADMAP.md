@@ -66,7 +66,7 @@ The original pure state kernel has been replaced by a stateful contract draft.
 
 ## Milestone 2 — production-shaped STRK20 escrow
 
-**Status: In progress — implementation complete locally; review and pool mapping gated**
+**Status: In progress — implementation complete locally; ABI package mapped, pool source gated**
 
 Current progress:
 
@@ -84,6 +84,11 @@ Current progress:
 - The live class's complete ABI and declaration timeline match StarkWare commit
   `5bf8aae`, but clean dev, release, and profile-probe artifacts from that
   commit still do not reproduce the live Sierra class hash.
+- The exact live ABI maps reproducibly to
+  `@starkware-libs/starknet-privacy-sdk@0.14.3-rc.5` (and RC.4), but an SDK ABI
+  match is not deployed-class source provenance. Official Scarb 2.17.0 builds
+  of every public PR revision and the merge on ARM64 macOS and x86_64 Linux do
+  not reproduce the live class.
 - A read-only Starknet SDK health command requires two providers, current and
   advancing accepted heads, exact common-block agreement, recomputed class and
   ABI fingerprints, and successful pool view calls.
@@ -104,6 +109,9 @@ Current progress:
 - Obtain primary-source mapping from the observed Sepolia pool class to its
   exact build artifact/configuration for candidate commit `5bf8aae`; the
   integration fails closed until the class hash is reproduced.
+- Require the exact source tree, lockfile, effective compiler profile, Sierra
+  artifact, and CASM artifact; do not accept the now-resolved SDK/ABI mapping as
+  a substitute for those declaration artifacts.
 - Verify the current Sepolia privacy-pool address, class, ABI, and supported
   `privacy_invoke` action shape from primary sources.
 - Run the project with the pinned Scarb and Cairo toolchain rather than relying

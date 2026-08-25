@@ -65,9 +65,13 @@ action or fund movement was performed.
 
 1. **Unreproduced STRK20 pool class.** The live class's complete ABI and
    declaration timing match StarkWare commit `5bf8aae`, but the commit's clean
-   dev and release artifacts do not reproduce the live Sierra class hash. The
-   remaining difference is an unpublished build profile, dependency state, or
-   source change; source-level correlation is not artifact provenance.
+   dev and release artifacts do not reproduce the live Sierra class hash.
+   RC.4 and RC.5 of `@starkware-libs/starknet-privacy-sdk` both reproduce the
+   live ABI fingerprint, but not the deployed class. Every public PR revision
+   was also rebuilt, and the merge result was identical on ARM64 macOS and
+   x86_64 Linux. The remaining difference is an unpublished build profile,
+   dependency state, or source change; source-level correlation and ABI package
+   identity are not artifact provenance.
 2. **Attestor trust.** GigstarkPassport verifies a policy-pinned attestation
    receipt. It does not directly verify the underlying ZK proof. Issuance,
    proof-verifier operation, attestor key storage/rotation, and compromise

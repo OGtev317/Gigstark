@@ -1,5 +1,10 @@
 export const STRK20_CONTRACT_SOURCE_RELEASE = "PRIVACY-0.14.3-RC.0" as const;
 export const STRK20_WALLET_SDK_RELEASE = "PRIVACY-0.14.3-RC.5" as const;
+export const STRK20_WALLET_SDK_PACKAGE =
+  "@starkware-libs/starknet-privacy-sdk" as const;
+export const STRK20_WALLET_SDK_VERSION = "0.14.3-rc.5" as const;
+export const STRK20_WALLET_SDK_COMMIT =
+  "66e3caae8c0201227a6719696d004e30d90aea65" as const;
 export const STRK20_STARKNET_VERSION = "2.17.0" as const;
 export const STRK20_SEPOLIA_POOL = "0x0254a6b2997ef52e9f830ce1f543f6b29768295e8d17e2267d672c552cfe0d91" as const;
 export const STRK20_REVIEWED_POOL_CLASS_HASH = "0x52107fadffab71bdcbb6b2ccb68ba3e1b5558d94036538053e159d3076ad633" as const;
@@ -9,6 +14,8 @@ export const STRK20_EXPECTED_LIVE_ABI_SHA256 = "82048b31b314b22d58ef6c72064ff6ce
 export const STRK20_SOURCE_CANDIDATE_COMMIT = "5bf8aae27f9c1aaefa53eea133dc29343ad196ac" as const;
 export const STRK20_SOURCE_CANDIDATE_RELEASE_CLASS_HASH = "0x261555f9ef241e0b246ace06edafeca8d28d79e8dfbaa6ac326c398bce59b82" as const;
 export const STRK20_SOURCE_CANDIDATE_DEV_CLASS_HASH = "0x7af31b00093e5ba2d51a0bd68b5cb4ef3b011af349ade4bb6aa3dbb108f153c" as const;
+export const STRK20_SOURCE_CANDIDATE_RELEASE_SIERRA_LENGTH = 20_618 as const;
+export const STRK20_LIVE_SIERRA_LENGTH = 20_646 as const;
 export const STRK20_LIVE_CLASS_DECLARATION_BLOCK = 12_932_191 as const;
 export const STRK20_LIVE_CLASS_DECLARATION_TRANSACTION = "0x1139db11de5493f884322d528ec89cf91560eadc52a5ae909d68668451019b7" as const;
 export const STRK20_LIVE_COMPILED_CLASS_HASH = "0x674605405ee63b71556db1c252e7bcb112babd1b0ea89562aa29ed75111db75" as const;

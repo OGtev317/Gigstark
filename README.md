@@ -78,6 +78,9 @@ issuer/attestor governance, live Wallet API execution, and the live pool's
 upgraded class artifact reproduction remain unresolved. The live ABI and declaration
 timeline now narrow the source candidate to StarkWare commit `5bf8aae`, but its
 repository-defined build profiles do not reproduce the on-chain class hash.
+The interface itself is exactly mapped to
+`@starkware-libs/starknet-privacy-sdk@0.14.3-rc.5`; that ABI-level result does
+not unlock live submission without the matching Sierra and CASM artifacts.
 Independent security review and fresh network verification are required before
 any declaration or deployment.
 

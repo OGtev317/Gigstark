@@ -19,6 +19,12 @@ import {
   STRK20_SOURCE_CANDIDATE_COMMIT,
   STRK20_SOURCE_CANDIDATE_DEV_CLASS_HASH,
   STRK20_SOURCE_CANDIDATE_RELEASE_CLASS_HASH,
+  STRK20_SOURCE_CANDIDATE_RELEASE_SIERRA_LENGTH,
+  STRK20_LIVE_SIERRA_LENGTH,
+  STRK20_WALLET_SDK_COMMIT,
+  STRK20_WALLET_SDK_PACKAGE,
+  STRK20_WALLET_SDK_RELEASE,
+  STRK20_WALLET_SDK_VERSION,
 } from "../src/lib/strk20-sepolia";
 
 function sameFelt(left: string, right: string): boolean {
@@ -155,9 +161,20 @@ async function main() {
           repository: "starkware-libs/starknet-privacy",
           commit: STRK20_SOURCE_CANDIDATE_COMMIT,
           abiMatch: sourceCandidateAbiMatch,
+          abiPackage: {
+            name: STRK20_WALLET_SDK_PACKAGE,
+            version: STRK20_WALLET_SDK_VERSION,
+            release: STRK20_WALLET_SDK_RELEASE,
+            commit: STRK20_WALLET_SDK_COMMIT,
+          },
           releaseClassHash: STRK20_SOURCE_CANDIDATE_RELEASE_CLASS_HASH,
           devClassHash: STRK20_SOURCE_CANDIDATE_DEV_CLASS_HASH,
+          releaseSierraLength: STRK20_SOURCE_CANDIDATE_RELEASE_SIERRA_LENGTH,
+          liveSierraLength: STRK20_LIVE_SIERRA_LENGTH,
           classReproduced: sourceCandidateClassReproduced,
+          status: sourceCandidateClassReproduced
+            ? "SOURCE_REPRODUCED"
+            : "ABI_PACKAGE_MAPPED_SOURCE_UNREPRODUCED",
         },
         history,
       },

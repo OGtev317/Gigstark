@@ -13,6 +13,7 @@ an SDK release and is not used as the contract dependency pin.
 | Upstream Cairo/Starknet package | `2.17.0` |
 | Required return | `privacy::objects::OpenNoteDeposit` as `Span<OpenNoteDeposit>` |
 | Wallet stack | `starknet@10.4.0`, Wallet API types `0.10.3`, discovery `6.0.2`, wallet standard `6.0.2` |
+| Exact ABI package | `@starkware-libs/starknet-privacy-sdk@0.14.3-rc.5`, tag `PRIVACY-0.14.3-RC.5`, commit `66e3caae8c0201227a6719696d004e30d90aea65` |
 | Live-source candidate | `starkware-libs/starknet-privacy@5bf8aae27f9c1aaefa53eea133dc29343ad196ac` |
 | Canonical live ABI SHA-256 | `82048b31b314b22d58ef6c72064ff6ce9ba554ea6b924f9eac7cd032bac9848f` |
 
@@ -73,6 +74,28 @@ build-profile, dependency-state, or source difference. The `OpenNoteDeposit`
 definition itself is unchanged between RC.0 and the candidate commit, but that
 fact does not authorize the upgraded pool class.
 
+The ABI/package mapping is exact and separately reproducible. The generated
+87-item pool ABI in both SDK tags `PRIVACY-0.14.3-RC.4` and
+`PRIVACY-0.14.3-RC.5` hashes to `82048b31...9848f`, exactly matching the class
+returned by Sepolia. Gigstark pins RC.5 for Wallet SDK interface work. This
+proves interface identity; it does not prove that RC.5 produced the deployed
+Sierra class.
+
+The public source lineage was rebuilt with the official Scarb 2.17.0 toolchain:
+
+| Source revision | Release class | Sierra felts |
+| --- | --- | ---: |
+| V2 parent `c02eca0` | `0x067dddd8...6b554d` | 20,546 |
+| PR revision `d4768dd` | `0x06b3e282...6218a94` | 20,562 |
+| PR revisions `9e28913` / `964ef72` | `0x02acb134...43563a` | 20,602 |
+| PR head `b496442` / merge `5bf8aae` | `0x026155f9...59b82` | 20,618 |
+| Live Sepolia class | `0x056ab118...623b2` | 20,646 |
+
+The merge build was reproduced on ARM64 macOS and with the same x86_64 Linux
+Scarb binary used by public CI; both produced `0x026155...59b82`. Compiler-host
+architecture therefore does not explain the live class. The public merge CI
+ran tests only and published no contract artifact.
+
 A local clean-room source survey rebuilt every contract-affecting mainline
 commit from the official screening audit base through current `main`, using
 each commit's pinned Scarb generation (`2.17.0` or `2.18.0`). It also checked
@@ -102,6 +125,12 @@ The zero-second pool upgrade delay means class provenance can change without a
 timelock window. A health result is only a point-in-time observation. Gigstark
 must re-read the exact class immediately before preparation and submission and
 must continue to reject any class outside the reviewed allowlist.
+
+To clear the source gate, upstream must provide enough primary evidence to
+recompute both declaration hashes: the exact source tree or commit, `Scarb.lock`,
+Scarb/Cairo version, effective workspace profile, Sierra artifact matching
+`0x56ab...623b2`, and CASM artifact matching `0x674605...db75`. A release tag or
+SDK version without those artifacts is insufficient.
 
 The checked-in `.tool-versions` pins Scarb `2.17.0` and Starknet Foundry
 `0.59.0`. The Cairo draft imports only the reviewed `OpenNoteDeposit` type from
