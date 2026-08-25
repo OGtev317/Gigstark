@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   STARKNET_SEPOLIA_CHAIN_ID,
+  assertDistinctEndpoints,
   assertHealthyHeads,
   assertPoolAgreement,
   canonicalAbiSha256,
@@ -9,6 +10,7 @@ import {
   type StarknetHeadSnapshot,
   type StarknetPoolSnapshot,
 } from "../src/lib/starknet-health";
+import { STARKNET_MAINNET_CHAIN_ID } from "../src/lib/strk20-mainnet";
 import { STRK20_EXPECTED_LIVE_ABI_SHA256 } from "../src/lib/strk20-sepolia";
 
 const head = (endpoint: string): StarknetHeadSnapshot => ({
@@ -60,6 +62,39 @@ test("rejects wrong-chain and stale providers", () => {
   assert.throws(
     () => assertHealthyHeads([head("one"), { ...head("two"), timestamp: 800 }], 1_030, 120),
     /STARKNET_STALE_HEAD/,
+  );
+});
+
+test("accepts a separately pinned Mainnet chain", () => {
+  assert.doesNotThrow(() =>
+    assertHealthyHeads(
+      [
+        { ...head("one"), chainId: STARKNET_MAINNET_CHAIN_ID },
+        { ...head("two"), chainId: STARKNET_MAINNET_CHAIN_ID },
+      ],
+      1_030,
+      120,
+      STARKNET_MAINNET_CHAIN_ID,
+    ),
+  );
+});
+
+test("requires two distinctly configured RPC endpoints", () => {
+  assert.throws(
+    () =>
+      assertDistinctEndpoints([
+        { name: "one", url: "https://rpc.example" },
+        { name: "two", url: "https://rpc.example/" },
+      ]),
+    /STARKNET_ENDPOINT_URL_DUPLICATE/,
+  );
+  assert.throws(
+    () =>
+      assertDistinctEndpoints([
+        { name: "same", url: "https://one.example" },
+        { name: "SAME", url: "https://two.example" },
+      ]),
+    /STARKNET_ENDPOINT_NAME_DUPLICATE/,
   );
 });
 

@@ -1,7 +1,7 @@
 # Gigstark
 
-Gigstark is a local, non-custodial STRK20 prototype for private freelance
-milestones and creator subscriptions on Starknet. Its settlement center is a
+Gigstark is a non-custodial STRK20 prototype for private freelance milestones
+and creator subscriptions on Starknet. Its settlement center is a
 directly verified ZK proof. Marlin Oyster can add a separately verifiable TEE
 receipt for confidential execution, but that optional receipt cannot authorize,
 block, or override settlement. It is a standalone project and does not use
@@ -29,6 +29,9 @@ Athera L1 or L3.
 - A Wallet API preparation layer for private `withdraw -> invoke` deposits and
   `open transfer -> invoke` winner claims, guarded by exact pool address and
   class checks.
+- A read-only dual-network pool gate: Sepolia remains a source-provenance
+  diagnostic, while source-reproduced STRK20 V2 on Mainnet is the hackathon
+  release target.
 - A browser review flow that detects capability without balance access, checks
   the connected wallet network, dry-runs the exact deposit and winner-note
   actions, and enables each explicit signature request only after separate user
@@ -41,6 +44,10 @@ Athera L1 or L3.
 The UI contains an explicit prepare-then-sign transaction flow, but the current
 live Sepolia pool class is intentionally rejected before wallet preparation or
 submission because it has not been reproduced from a reviewed source build.
+The source-reproduced Mainnet V2 class has a separate read-only health and class
+gate plus a library-only dry-run preparation path. The public UI and submission
+path remain disabled for Mainnet; no declaration, deployment, or fund movement
+is enabled.
 Capability detection does not connect a wallet or request private balances.
 Once the user explicitly connects, note discovery, proving, and signing remain
 inside the wallet. Gigstark must never collect viewing or spending keys.
@@ -58,6 +65,7 @@ npm run typecheck
 npm run build
 npm run verify:starknet-health
 npm run verify:strk20-pool # expected to fail closed until source reproduction
+npm run verify:strk20-mainnet # read-only Mainnet V2 health and class gate
 npm run proof:verify
 # npm run compute:verify requires Scarb 2.17.0 and snforge 0.59.0
 npm run dev
@@ -67,7 +75,7 @@ Open `http://localhost:3000`.
 
 ## Contract direction
 
-`contracts/` contains a Sepolia-only, stateful Cairo anonymizer draft with a
+`contracts/` contains a stateful Cairo anonymizer draft with a
 pool-only `privacy_invoke`, balance accounting, cryptographic receipt-based role
 authorization, direct-ZK compute resolution, bounded prepaid subscriptions, tier
 proof consumption, and one reviewed `OpenNoteDeposit` return per valid claim.

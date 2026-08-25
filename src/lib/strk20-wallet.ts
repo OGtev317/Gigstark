@@ -5,11 +5,37 @@ import {
   STRK20_REVIEWED_POOL_CLASS_HASH,
   STRK20_SEPOLIA_POOL,
 } from "./strk20-sepolia";
+import {
+  STARKNET_MAINNET_CHAIN_ID,
+  STRK20_MAINNET_POOL,
+  STRK20_MAINNET_V2_CLASS_HASH,
+} from "./strk20-mainnet";
 
 export const STRK20_WALLET_API_MIN_VERSION = "0.10.3";
 export const STRK20_SEPOLIA_POOL_ADDRESS = STRK20_SEPOLIA_POOL;
 export const STRK20_REVIEWED_RC0_CLASS_HASH = STRK20_REVIEWED_POOL_CLASS_HASH;
 export const STRK20_OBSERVED_SEPOLIA_CLASS_HASH = STRK20_OBSERVED_POOL_CLASS_HASH;
+
+export type ReviewedPoolTarget = {
+  network: "SN_SEPOLIA" | "SN_MAIN";
+  chainId: string;
+  address: string;
+  classHash: string;
+};
+
+export const STRK20_SEPOLIA_REVIEW_TARGET: ReviewedPoolTarget = {
+  network: "SN_SEPOLIA",
+  chainId: "0x534e5f5345504f4c4941",
+  address: STRK20_SEPOLIA_POOL_ADDRESS,
+  classHash: STRK20_REVIEWED_RC0_CLASS_HASH,
+};
+
+export const STRK20_MAINNET_REVIEW_TARGET: ReviewedPoolTarget = {
+  network: "SN_MAIN",
+  chainId: STARKNET_MAINNET_CHAIN_ID,
+  address: STRK20_MAINNET_POOL,
+  classHash: STRK20_MAINNET_V2_CLASS_HASH,
+};
 
 const OP_DEPOSIT = 0n;
 const OP_CLAIM = 5n;
@@ -93,10 +119,17 @@ export function supportsWalletApiVersions(versions: readonly string[]): boolean 
 }
 
 export function assertReviewedSepoliaPool(pool: ReviewedPool): void {
-  if (!sameFelt(pool.address, STRK20_SEPOLIA_POOL_ADDRESS)) {
+  assertReviewedPoolTarget(pool, STRK20_SEPOLIA_REVIEW_TARGET);
+}
+
+export function assertReviewedPoolTarget(
+  pool: ReviewedPool,
+  target: ReviewedPoolTarget,
+): void {
+  if (!sameFelt(pool.address, target.address)) {
     throw new Error("STRK20_POOL_ADDRESS_MISMATCH");
   }
-  if (!sameFelt(pool.classHash, STRK20_REVIEWED_RC0_CLASS_HASH)) {
+  if (!sameFelt(pool.classHash, target.classHash)) {
     throw new Error("STRK20_POOL_CLASS_UNREVIEWED");
   }
 }
@@ -104,18 +137,28 @@ export function assertReviewedSepoliaPool(pool: ReviewedPool): void {
 export async function verifyReviewedSepoliaPool(
   provider: StarknetPoolProvider,
 ): Promise<ReviewedPool> {
+  return verifyReviewedPoolTarget(provider, STRK20_SEPOLIA_REVIEW_TARGET);
+}
+
+export async function verifyReviewedPoolTarget(
+  provider: StarknetPoolProvider,
+  target: ReviewedPoolTarget,
+): Promise<ReviewedPool> {
   const chainId = await provider.getChainId();
-  if (!isSepoliaChainId(chainId)) throw new Error("STRK20_WRONG_CHAIN");
+  if (!isTargetChainId(chainId, target)) throw new Error("STRK20_WRONG_CHAIN");
   const pool = {
-    address: STRK20_SEPOLIA_POOL_ADDRESS,
-    classHash: await provider.getClassHashAt(STRK20_SEPOLIA_POOL_ADDRESS, "latest"),
+    address: target.address,
+    classHash: await provider.getClassHashAt(target.address, "latest"),
   };
-  assertReviewedSepoliaPool(pool);
+  assertReviewedPoolTarget(pool, target);
   return pool;
 }
 
-export function buildPrivateDepositActions(input: EscrowDepositInput): STRK20_ACTION[] {
-  assertReviewedSepoliaPool(input.pool);
+export function buildPrivateDepositActions(
+  input: EscrowDepositInput,
+  target: ReviewedPoolTarget = STRK20_SEPOLIA_REVIEW_TARGET,
+): STRK20_ACTION[] {
+  assertReviewedPoolTarget(input.pool, target);
   const amount = requireU128(input.amount, "INVALID_DEPOSIT_AMOUNT");
   const escrowAddress = requireAddress(input.escrowAddress, "INVALID_ESCROW_ADDRESS");
   const token = requireAddress(input.token, "INVALID_TOKEN_ADDRESS");
@@ -147,8 +190,11 @@ export function buildPrivateDepositActions(input: EscrowDepositInput): STRK20_AC
   ];
 }
 
-export function buildWinnerClaimActions(input: EscrowClaimInput): STRK20_ACTION[] {
-  assertReviewedSepoliaPool(input.pool);
+export function buildWinnerClaimActions(
+  input: EscrowClaimInput,
+  target: ReviewedPoolTarget = STRK20_SEPOLIA_REVIEW_TARGET,
+): STRK20_ACTION[] {
+  assertReviewedPoolTarget(input.pool, target);
   const escrowAddress = requireAddress(input.escrowAddress, "INVALID_ESCROW_ADDRESS");
   const token = requireAddress(input.token, "INVALID_TOKEN_ADDRESS");
   const recipient = requireAddress(input.recipient, "INVALID_RECIPIENT_ADDRESS");
@@ -193,6 +239,20 @@ export async function preparePrivateDepositForReview(
 ): Promise<STRK20_ACTION[]> {
   const pool = await verifyReviewedSepoliaPool(provider);
   const actions = buildPrivateDepositActions({ ...input, pool });
+  await account.strk20PrepareInvoke(actions, true);
+  return actions;
+}
+
+export async function prepareMainnetPrivateDepositForReview(
+  account: Strk20WalletAccount,
+  provider: StarknetPoolProvider,
+  input: Omit<EscrowDepositInput, "pool">,
+): Promise<STRK20_ACTION[]> {
+  const pool = await verifyReviewedPoolTarget(provider, STRK20_MAINNET_REVIEW_TARGET);
+  const actions = buildPrivateDepositActions(
+    { ...input, pool },
+    STRK20_MAINNET_REVIEW_TARGET,
+  );
   await account.strk20PrepareInvoke(actions, true);
   return actions;
 }
@@ -321,9 +381,9 @@ function sameFelt(left: FeltInput, right: FeltInput): boolean {
   }
 }
 
-function isSepoliaChainId(chainId: string): boolean {
-  if (chainId === "SN_SEPOLIA") return true;
-  return sameFelt(chainId, "0x534e5f5345504f4c4941");
+function isTargetChainId(chainId: string, target: ReviewedPoolTarget): boolean {
+  if (chainId === target.network) return true;
+  return sameFelt(chainId, target.chainId);
 }
 
 function compareVersions(left: string, right: string): number {

@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   STRK20_OBSERVED_SEPOLIA_CLASS_HASH,
+  STRK20_MAINNET_REVIEW_TARGET,
   STRK20_REVIEWED_RC0_CLASS_HASH,
   STRK20_SEPOLIA_POOL_ADDRESS,
   buildPrivateDepositActions,
   buildWinnerClaimActions,
   preparePrivateDeposit,
   preparePrivateDepositForReview,
+  prepareMainnetPrivateDepositForReview,
   prepareWinnerClaimForReview,
   submitPreparedActions,
   supportsWalletApiVersions,
@@ -15,6 +17,7 @@ import {
   type EscrowDepositInput,
   type GigstarkPassportProofCalldata,
   type StarknetEscrowProvider,
+  type StarknetPoolProvider,
   type Strk20WalletAccount,
 } from "../src/lib/strk20-wallet";
 
@@ -56,6 +59,19 @@ const provider = (
     assert.deepEqual(call.calldata, ["0x789"]);
     assert.equal(blockIdentifier, "latest");
     return escrowRecord;
+  },
+});
+
+const mainnetProvider = (
+  classHash: string = STRK20_MAINNET_REVIEW_TARGET.classHash,
+): StarknetPoolProvider => ({
+  async getChainId() {
+    return "SN_MAIN";
+  },
+  async getClassHashAt(address, blockIdentifier) {
+    assert.equal(address, STRK20_MAINNET_REVIEW_TARGET.address);
+    assert.equal(blockIdentifier, "latest");
+    return classHash;
   },
 });
 
@@ -222,6 +238,53 @@ test("preparation never reaches the wallet when the live class is unreviewed", a
       provider(STRK20_OBSERVED_SEPOLIA_CLASS_HASH),
       claim(),
     ),
+    /STRK20_POOL_CLASS_UNREVIEWED/,
+  );
+  assert.equal(prepared, false);
+});
+
+test("Mainnet preparation dry-runs against V2 while submission remains disabled", async () => {
+  const calls: string[] = [];
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke(actions, simulate) {
+      calls.push(`prepare:${actions.length}:${String(simulate)}`);
+      return {};
+    },
+    async strk20InvokeTransaction() {
+      calls.push("submit");
+      return { transaction_hash: "0xfeed" };
+    },
+  };
+  const { pool: _pool, ...depositInput } = deposit();
+  const actions = await prepareMainnetPrivateDepositForReview(
+    account,
+    mainnetProvider(),
+    depositInput,
+  );
+  assert.equal(actions.length, 2);
+  assert.deepEqual(calls, ["prepare:2:true"]);
+
+  await assert.rejects(
+    submitPreparedActions(account, mainnetProvider(), actions),
+    /STRK20_WRONG_CHAIN/,
+  );
+  assert.deepEqual(calls, ["prepare:2:true"]);
+});
+
+test("Mainnet preparation fails before the wallet when the live class changes", async () => {
+  let prepared = false;
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke() {
+      prepared = true;
+      return {};
+    },
+    async strk20InvokeTransaction() {
+      throw new Error("NOT_EXPECTED");
+    },
+  };
+  const { pool: _pool, ...depositInput } = deposit();
+  await assert.rejects(
+    prepareMainnetPrivateDepositForReview(account, mainnetProvider("0x123"), depositInput),
     /STRK20_POOL_CLASS_UNREVIEWED/,
   );
   assert.equal(prepared, false);

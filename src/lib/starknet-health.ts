@@ -14,6 +14,13 @@ export const DEFAULT_STARKNET_SEPOLIA_ENDPOINTS = [
 ] as const;
 
 export type StarknetEndpoint = { name: string; url: string };
+export type StarknetPoolTarget = {
+  network: "SN_SEPOLIA" | "SN_MAIN";
+  chainId: string;
+  pool: string;
+  expectedAbiSha256: string;
+  expectedPoolVersion: string;
+};
 
 export type StarknetHeadSnapshot = {
   endpoint: string;
@@ -45,7 +52,7 @@ export type StarknetPoolSnapshot = {
 };
 
 export type StarknetHealthReport = {
-  network: "SN_SEPOLIA";
+  network: StarknetPoolTarget["network"];
   checkedAt: string;
   intervalMs: number;
   firstHeads: StarknetHeadSnapshot[];
@@ -73,8 +80,31 @@ export async function checkStarknetSepoliaHealth(options: {
   maxHeadAgeSeconds?: number;
   nowSeconds?: () => number;
 } = {}): Promise<StarknetHealthReport> {
-  const endpoints = options.endpoints ?? DEFAULT_STARKNET_SEPOLIA_ENDPOINTS;
+  return checkStarknetPoolHealth({
+    target: {
+      network: "SN_SEPOLIA",
+      chainId: STARKNET_SEPOLIA_CHAIN_ID,
+      pool: STRK20_SEPOLIA_POOL,
+      expectedAbiSha256: STRK20_EXPECTED_LIVE_ABI_SHA256,
+      expectedPoolVersion: "2.0",
+    },
+    endpoints: options.endpoints ?? DEFAULT_STARKNET_SEPOLIA_ENDPOINTS,
+    intervalMs: options.intervalMs,
+    maxHeadAgeSeconds: options.maxHeadAgeSeconds,
+    nowSeconds: options.nowSeconds,
+  });
+}
+
+export async function checkStarknetPoolHealth(options: {
+  target: StarknetPoolTarget;
+  endpoints: readonly StarknetEndpoint[];
+  intervalMs?: number;
+  maxHeadAgeSeconds?: number;
+  nowSeconds?: () => number;
+}): Promise<StarknetHealthReport> {
+  const { target, endpoints } = options;
   if (endpoints.length < 2) throw new Error("STARKNET_HEALTH_REQUIRES_TWO_ENDPOINTS");
+  assertDistinctEndpoints(endpoints);
   const intervalMs = options.intervalMs ?? DEFAULT_STARKNET_HEALTH_INTERVAL_MS;
   if (!Number.isInteger(intervalMs) || intervalMs < 1_000 || intervalMs > 30_000) {
     throw new Error("INVALID_STARKNET_HEALTH_INTERVAL");
@@ -88,22 +118,22 @@ export async function checkStarknetSepoliaHealth(options: {
   }));
 
   const firstHeads = await Promise.all(bindings.map(readHead));
-  assertHealthyHeads(firstHeads, nowSeconds(), maxHeadAgeSeconds);
+  assertHealthyHeads(firstHeads, nowSeconds(), maxHeadAgeSeconds, target.chainId);
   const firstCommonBlock = Math.min(...firstHeads.map((head) => head.blockNumber));
   const firstPoolState = await Promise.all(
-    bindings.map((binding) => readPoolState(binding, firstCommonBlock)),
+    bindings.map((binding) => readPoolState(binding, firstCommonBlock, target)),
   );
-  assertPoolAgreement(firstPoolState);
+  assertPoolAgreement(firstPoolState, target);
 
   await new Promise((resolve) => setTimeout(resolve, intervalMs));
 
   const secondHeads = await Promise.all(bindings.map(readHead));
-  assertHealthyHeads(secondHeads, nowSeconds(), maxHeadAgeSeconds);
+  assertHealthyHeads(secondHeads, nowSeconds(), maxHeadAgeSeconds, target.chainId);
   const secondCommonBlock = Math.min(...secondHeads.map((head) => head.blockNumber));
   const secondPoolState = await Promise.all(
-    bindings.map((binding) => readPoolState(binding, secondCommonBlock)),
+    bindings.map((binding) => readPoolState(binding, secondCommonBlock, target)),
   );
-  assertPoolAgreement(secondPoolState);
+  assertPoolAgreement(secondPoolState, target);
 
   const advancedBy = Object.fromEntries(
     firstHeads.map((first) => {
@@ -116,7 +146,7 @@ export async function checkStarknetSepoliaHealth(options: {
   );
 
   return {
-    network: "SN_SEPOLIA",
+    network: target.network,
     checkedAt: new Date(nowSeconds() * 1_000).toISOString(),
     intervalMs,
     firstHeads,
@@ -129,14 +159,29 @@ export async function checkStarknetSepoliaHealth(options: {
   };
 }
 
+export function assertDistinctEndpoints(endpoints: readonly StarknetEndpoint[]): void {
+  const names = new Set<string>();
+  const urls = new Set<string>();
+  for (const endpoint of endpoints) {
+    const name = endpoint.name.trim().toLowerCase();
+    const url = endpoint.url.trim().replace(/\/+$/, "").toLowerCase();
+    if (!name || !url) throw new Error("STARKNET_ENDPOINT_INVALID");
+    if (names.has(name)) throw new Error(`STARKNET_ENDPOINT_NAME_DUPLICATE:${endpoint.name}`);
+    if (urls.has(url)) throw new Error(`STARKNET_ENDPOINT_URL_DUPLICATE:${endpoint.name}`);
+    names.add(name);
+    urls.add(url);
+  }
+}
+
 export function assertHealthyHeads(
   heads: readonly StarknetHeadSnapshot[],
   nowSeconds: number,
   maxHeadAgeSeconds: number,
+  expectedChainId: string = STARKNET_SEPOLIA_CHAIN_ID,
 ): void {
   if (heads.length < 2) throw new Error("STARKNET_HEALTH_REQUIRES_TWO_ENDPOINTS");
   for (const head of heads) {
-    if (!sameFelt(head.chainId, STARKNET_SEPOLIA_CHAIN_ID)) {
+    if (!sameFelt(head.chainId, expectedChainId)) {
       throw new Error(`STARKNET_WRONG_CHAIN:${head.endpoint}`);
     }
     if (head.syncing !== false) throw new Error(`STARKNET_PROVIDER_SYNCING:${head.endpoint}`);
@@ -150,7 +195,13 @@ export function assertHealthyHeads(
   }
 }
 
-export function assertPoolAgreement(states: readonly StarknetPoolSnapshot[]): void {
+export function assertPoolAgreement(
+  states: readonly StarknetPoolSnapshot[],
+  target: Pick<StarknetPoolTarget, "expectedAbiSha256" | "expectedPoolVersion"> = {
+    expectedAbiSha256: STRK20_EXPECTED_LIVE_ABI_SHA256,
+    expectedPoolVersion: "2.0",
+  },
+): void {
   if (states.length < 2) throw new Error("STARKNET_HEALTH_REQUIRES_TWO_ENDPOINTS");
   const expected = states[0];
   if (!expected) throw new Error("STARKNET_POOL_STATE_MISSING");
@@ -164,10 +215,10 @@ export function assertPoolAgreement(states: readonly StarknetPoolSnapshot[]): vo
     if (!sameFelt(state.recomputedClassHash, state.classHash)) {
       throw new Error(`STARKNET_POOL_CLASS_HASH_INVALID:${state.endpoint}`);
     }
-    if (state.abiSha256 !== STRK20_EXPECTED_LIVE_ABI_SHA256) {
+    if (state.abiSha256 !== target.expectedAbiSha256) {
       throw new Error(`STARKNET_POOL_ABI_MISMATCH:${state.endpoint}`);
     }
-    if (state.poolVersion !== "2.0") {
+    if (state.poolVersion !== target.expectedPoolVersion) {
       throw new Error(`STARKNET_POOL_VERSION_MISMATCH:${state.endpoint}`);
     }
     if (state.requiredAbiSurface.length !== 7) {
@@ -269,31 +320,32 @@ async function readHead(binding: ProviderBinding): Promise<StarknetHeadSnapshot>
 async function readPoolState(
   binding: ProviderBinding,
   blockNumber: number,
+  target: StarknetPoolTarget,
 ): Promise<StarknetPoolSnapshot> {
   const { endpoint, provider } = binding;
   const [block, classHash, contractClass, version, fee, validity, upgradeDelay] =
     await Promise.all([
       provider.getBlockWithTxHashes(blockNumber),
-      provider.getClassHashAt(STRK20_SEPOLIA_POOL, blockNumber),
-      provider.getClassAt(STRK20_SEPOLIA_POOL, blockNumber),
+      provider.getClassHashAt(target.pool, blockNumber),
+      provider.getClassAt(target.pool, blockNumber),
       provider.callContract(
-        { contractAddress: STRK20_SEPOLIA_POOL, entrypoint: "get_version", calldata: [] },
+        { contractAddress: target.pool, entrypoint: "get_version", calldata: [] },
         blockNumber,
       ),
       provider.callContract(
-        { contractAddress: STRK20_SEPOLIA_POOL, entrypoint: "get_fee_amount", calldata: [] },
+        { contractAddress: target.pool, entrypoint: "get_fee_amount", calldata: [] },
         blockNumber,
       ),
       provider.callContract(
         {
-          contractAddress: STRK20_SEPOLIA_POOL,
+          contractAddress: target.pool,
           entrypoint: "get_proof_validity_blocks",
           calldata: [],
         },
         blockNumber,
       ),
       provider.callContract(
-        { contractAddress: STRK20_SEPOLIA_POOL, entrypoint: "get_upgrade_delay", calldata: [] },
+        { contractAddress: target.pool, entrypoint: "get_upgrade_delay", calldata: [] },
         blockNumber,
       ),
     ]);

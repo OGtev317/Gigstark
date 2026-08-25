@@ -1,13 +1,17 @@
 # Gigstark roadmap
 
-Last reviewed: 2026-08-24
+Last reviewed: 2026-08-25
 
 Gigstark is a standalone Starknet and STRK20 project for private freelance
 milestones, creator subscriptions, and proof-gated access. Its strategic center
 is now direct ZK settlement with an optional, independently verifiable Oyster
 TEE receipt for confidential execution evidence. Oyster never becomes a second
-settlement authority. It does not use Athera L1 or L3 contracts. Development remains local and Sepolia-only until
-the contract, wallet, privacy, and operational gates below are complete.
+settlement authority. It does not use Athera L1 or L3 contracts. Development
+uses local and Sepolia validation plus read-only Mainnet V2 verification; no
+Mainnet declaration, deployment, transaction submission, or fund movement is
+authorized until the contract, wallet, privacy, and operational gates below are
+complete. Mainnet Wallet API work is limited to a library-only dry run that
+cannot submit.
 
 ## Status legend
 
@@ -67,6 +71,14 @@ The original pure state kernel has been replaced by a stateful contract draft.
 ## Milestone 2 — production-shaped STRK20 escrow
 
 **Status: In progress — implementation complete locally; ABI package mapped, pool source gated**
+
+Mainnet V2 is the hackathon release target. The source-reproduced V2 class has
+a dedicated two-provider health/class allowlist. This evidence gate is
+read-only; Sepolia remains the diagnostic lane for the upgraded-class provenance
+gap, and none of the Mainnet implementation or transaction gates are relaxed.
+Library tests now cover a Mainnet V2 dry-run preparation path and prove that
+the existing submission function rejects Mainnet. The public UI does not expose
+that preparation path.
 
 Current progress:
 
