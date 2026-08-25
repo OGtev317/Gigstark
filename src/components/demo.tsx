@@ -17,7 +17,7 @@ export function Demo() {
   const steps = useMemo(() => [
     ["Private deposit", escrow.status !== "funded" ? "complete" : "active"],
     ["Delivery commitment", escrow.deliveryCommitment ? "complete" : "waiting"],
-    [mode === "confirm" ? "Buyer confirmation" : "TEE + ZK outcome", ["settled", "refunded"].includes(escrow.status) ? "complete" : "waiting"],
+    [mode === "confirm" ? "Buyer confirmation" : "ZK outcome", ["settled", "refunded"].includes(escrow.status) ? "complete" : "waiting"],
     ["Private-note claim", escrow.sellerClaimed || escrow.buyerClaimed ? "complete" : "waiting"],
   ], [escrow, mode]);
 
@@ -31,9 +31,9 @@ export function Demo() {
     <div className="roles"><span>Buyer commitment: <b>{escrow.buyerCommitment}</b></span><span>Seller commitment: <b>{escrow.sellerCommitment}</b></span><span>Amount: <b>not sent</b></span></div>
     <div className="step-grid">{steps.map(([name, state]) => <div key={name} className={`step ${state}`}><i />{name}<small>{state}</small></div>)}</div>
     <div className="controls">
-      <label>Resolution path<select value={mode} onChange={(event) => setMode(event.target.value as "confirm" | "dispute")}><option value="confirm">Buyer confirms delivery</option><option value="dispute">Dispute and hybrid compute outcome</option></select></label>
+      <label>Resolution path<select value={mode} onChange={(event) => setMode(event.target.value as "confirm" | "dispute")}><option value="confirm">Buyer confirms delivery</option><option value="dispute">Dispute and ZK settlement outcome</option></select></label>
       <button onClick={() => act(() => submitDelivery(escrow, "delivery:2f1…9bb"), "Delivery commitment recorded; the delivery content remains off-chain.")}>1. Submit delivery</button>
-      {mode === "confirm" ? <button onClick={() => act(() => settle(escrow, "seller"), "Buyer confirmation settled the seller outcome.")}>2. Confirm delivery</button> : <><button onClick={() => act(() => openDispute(escrow), "Dispute opened; no outcome selected.")}>2. Open dispute</button><button onClick={() => act(() => settle(escrow, "seller"), "Simulated TEE + ZK receipt selected seller.")}>3. Resolve to seller</button><button onClick={() => act(() => settle(escrow, "buyer"), "Simulated TEE + ZK receipt selected buyer.")}>3. Resolve to buyer</button></>}
+      {mode === "confirm" ? <button onClick={() => act(() => settle(escrow, "seller"), "Buyer confirmation settled the seller outcome.")}>2. Confirm delivery</button> : <><button onClick={() => act(() => openDispute(escrow), "Dispute opened; no outcome selected.")}>2. Open dispute</button><button onClick={() => act(() => settle(escrow, "seller"), "Simulated ZK result selected seller; Oyster receipt is optional evidence.")}>3. Resolve to seller</button><button onClick={() => act(() => settle(escrow, "buyer"), "Simulated ZK result selected buyer; Oyster receipt is optional evidence.")}>3. Resolve to buyer</button></>}
       <button onClick={() => act(() => claimPrivateNote(escrow, escrow.status === "settled" ? "seller" : "buyer"), "Private-note claim accepted. A second attempt will fail.")}>Final. Claim note</button>
     </div>
     <p className="notice" role="status">{notice}</p>

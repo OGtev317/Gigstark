@@ -6,8 +6,9 @@ The Groth16 verifier returns exactly eight BN254 public inputs in this order:
    exact disputed escrow state, chain, escrow contract, escrow ID, and action
    nonce.
 2. `policyId` — the immutable dispute-policy identifier.
-3. `programMeasurementCommitment` — a BN254 field commitment to the accepted
-   non-debug AWS Nitro PCR0 value and image release metadata.
+3. `programMeasurementCommitment` — a BN254 field commitment to the reviewed
+   dispute program release. An Oyster image ID/PCR receipt may independently
+   attest to that release, but is not itself a proof input authority.
 4. `requiredScore` — the public policy threshold, restricted to `0..100`.
 5. `evidenceCommitment` — Circom-compatible BN254 Poseidon of the private
    evidence score and private nonce.
@@ -25,5 +26,5 @@ note state, viewing keys, and spending keys must never enter source control or
 browser code.
 
 Changing the order, hash construction, comparison rule, field encoding, or
-meaning of an outcome requires a new circuit, verifying key, policy ID, and TEE
-measurement commitment.
+meaning of an outcome requires a new circuit, verifying key, policy ID, program
+commitment, and Oyster image review.

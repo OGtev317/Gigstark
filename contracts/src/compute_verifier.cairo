@@ -1,79 +1,74 @@
-//! Hybrid TEE + ZK verifiable-compute receipt verifier for Gigstark.
+//! Direct Groth16 dispute verifier for Gigstark settlement.
 //!
-//! Both policy-pinned Stark keys sign the same result statement. The TEE key
-//! represents an enclave key or attestation gateway key bound to a reviewed
-//! hardware measurement. The ZK key represents a verifier that accepted the
-//! proof commitment. This contract does not parse vendor quote certificate
-//! chains and does not directly verify the underlying ZK proof yet.
+//! A valid proof is the only authority that can produce a settlement outcome.
+//! An Oyster receipt hash may be referenced for independent TEE verification,
+//! but it is never required and can never override the proof result.
 
 use starknet::ContractAddress;
 
-pub const COMPUTE_RECEIPT_DOMAIN: felt252 = 'GIGSTARK_COMPUTE_V1';
-pub const COMPUTE_NULLIFIER_DOMAIN: felt252 = 'GIG_COMPUTE_NULL_V1';
+pub const COMPUTE_NULLIFIER_DOMAIN: felt252 = 'GIG_ZK_NULLIFIER_V1';
+pub const OYSTER_BINDING_DOMAIN: felt252 = 'GIG_OYSTER_BIND_V1';
 pub const COMPUTE_OUTCOME_BUYER: u8 = 1;
 pub const COMPUTE_OUTCOME_SELLER: u8 = 2;
-
-const STARK_CURVE_ORDER: felt252 =
-    0x800000000000010ffffffffffffffffb781126dcae7b2321e66a241adc64d2f;
-const STARK_CURVE_HALF_ORDER: felt252 =
-    0x4000000000000087fffffffffffffffdbc08936e573d9190f335120d6e32697;
 
 #[derive(Copy, Drop, Serde, starknet::Store)]
 pub struct GigstarkComputePolicy {
     pub audience: ContractAddress,
-    pub program_measurement: felt252,
+    pub program_commitment: felt252,
     pub compute_policy_hash: felt252,
+    pub required_score: u8,
     pub valid_from: u64,
     pub valid_until: u64,
-    pub tee_attestor_public_key: felt252,
-    pub zk_verifier_public_key: felt252,
+    pub zk_verifier: ContractAddress,
     pub active: bool,
 }
 
 #[derive(Copy, Drop, Serde)]
-pub struct GigstarkComputeReceipt {
+pub struct GigstarkZkResult {
     pub policy_id: felt252,
     pub audience: ContractAddress,
     pub job_id: felt252,
     pub input_commitment: felt252,
-    pub evidence_commitment: felt252,
-    pub result_commitment: felt252,
+    pub evidence_commitment: u256,
+    pub result_commitment: u256,
     pub outcome: u8,
-    pub attestation_commitment: felt252,
-    pub proof_commitment: felt252,
-    pub scope_nullifier: felt252,
-    pub issued_at: u64,
     pub expires_at: u64,
-    pub tee_signature_r: felt252,
-    pub tee_signature_s: felt252,
-    pub zk_signature_r: felt252,
-    pub zk_signature_s: felt252,
+    /// Hash of the raw Oyster attestation bundle. Zero means no optional TEE
+    /// receipt was supplied. This field is never a settlement authority.
+    pub oyster_receipt_commitment: u256,
+}
+
+#[starknet::interface]
+pub trait IGroth16VerifierBN254<TContractState> {
+    fn verify_groth16_proof_bn254(
+        self: @TContractState, full_proof_with_hints: Span<felt252>,
+    ) -> Result<Span<u256>, felt252>;
 }
 
 #[starknet::interface]
 pub trait IGigstarkComputeVerifier<TContractState> {
     fn get_admin(self: @TContractState) -> ContractAddress;
     fn get_policy(self: @TContractState, policy_id: felt252) -> GigstarkComputePolicy;
-    fn is_nullifier_used(
-        self: @TContractState, policy_id: felt252, scope_nullifier: felt252,
-    ) -> bool;
-    fn get_result_digest(self: @TContractState, receipt: GigstarkComputeReceipt) -> felt252;
+    fn is_nullifier_used(self: @TContractState, nullifier: felt252) -> bool;
+    fn get_result_nullifier(self: @TContractState, result: GigstarkZkResult) -> felt252;
+    fn get_oyster_binding(self: @TContractState, result: GigstarkZkResult) -> felt252;
     fn consume_result(
         ref self: TContractState,
         expected_job_id: felt252,
         expected_input_commitment: felt252,
-        receipt: GigstarkComputeReceipt,
+        result: GigstarkZkResult,
+        full_proof_with_hints: Span<felt252>,
     ) -> u8;
     fn set_policy(
         ref self: TContractState,
         policy_id: felt252,
         audience: ContractAddress,
-        program_measurement: felt252,
+        program_commitment: felt252,
         compute_policy_hash: felt252,
+        required_score: u8,
         valid_from: u64,
         valid_until: u64,
-        tee_attestor_public_key: felt252,
-        zk_verifier_public_key: felt252,
+        zk_verifier: ContractAddress,
     );
     fn set_policy_active(ref self: TContractState, policy_id: felt252, active: bool);
 }
@@ -82,23 +77,23 @@ pub mod errors {
     pub const ZERO_ADMIN: felt252 = 'COMPUTE_ZERO_ADMIN';
     pub const ONLY_ADMIN: felt252 = 'COMPUTE_ONLY_ADMIN';
     pub const INVALID_POLICY: felt252 = 'COMPUTE_BAD_POLICY';
-    pub const SAME_AUTHORITY: felt252 = 'COMPUTE_SAME_AUTH';
     pub const POLICY_INACTIVE: felt252 = 'COMPUTE_INACTIVE';
     pub const POLICY_EXPIRED: felt252 = 'COMPUTE_POLICY_TIME';
     pub const AUDIENCE_MISMATCH: felt252 = 'COMPUTE_AUDIENCE';
-    pub const INVALID_RECEIPT: felt252 = 'COMPUTE_BAD_RECEIPT';
-    pub const RECEIPT_EXPIRED: felt252 = 'COMPUTE_RECEIPT_TIME';
+    pub const INVALID_RESULT: felt252 = 'COMPUTE_BAD_RESULT';
+    pub const RESULT_EXPIRED: felt252 = 'COMPUTE_RESULT_TIME';
     pub const JOB_MISMATCH: felt252 = 'COMPUTE_JOB';
     pub const INPUT_MISMATCH: felt252 = 'COMPUTE_INPUT';
     pub const NULLIFIER_USED: felt252 = 'COMPUTE_REPLAY';
-    pub const INVALID_TEE_SIGNATURE: felt252 = 'COMPUTE_BAD_TEE_SIG';
-    pub const INVALID_ZK_SIGNATURE: felt252 = 'COMPUTE_BAD_ZK_SIG';
+    pub const PROOF_REJECTED: felt252 = 'COMPUTE_BAD_ZK_PROOF';
+    pub const PUBLIC_INPUT_COUNT: felt252 = 'COMPUTE_ZK_INPUTS';
+    pub const PUBLIC_SIGNAL_MISMATCH: felt252 = 'COMPUTE_ZK_BINDING';
 }
 
 #[starknet::contract]
 pub mod GigstarkComputeVerifier {
-    use core::ecdsa::check_ecdsa_signature;
     use core::num::traits::Zero;
+    use core::panic_with_felt252;
     use core::poseidon::poseidon_hash_span;
     use starknet::storage::{
         StorageMapReadAccess, StorageMapWriteAccess, StoragePointerReadAccess,
@@ -109,8 +104,9 @@ pub mod GigstarkComputeVerifier {
     };
     use super::{
         COMPUTE_NULLIFIER_DOMAIN, COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER,
-        COMPUTE_RECEIPT_DOMAIN, GigstarkComputePolicy, GigstarkComputeReceipt,
-        IGigstarkComputeVerifier, STARK_CURVE_HALF_ORDER, STARK_CURVE_ORDER, errors,
+        GigstarkComputePolicy, GigstarkZkResult, IGigstarkComputeVerifier,
+        IGroth16VerifierBN254Dispatcher, IGroth16VerifierBN254DispatcherTrait,
+        OYSTER_BINDING_DOMAIN, errors,
     };
 
     #[storage]
@@ -126,6 +122,7 @@ pub mod GigstarkComputeVerifier {
         PolicyConfigured: PolicyConfigured,
         PolicyStatusChanged: PolicyStatusChanged,
         ResultConsumed: ResultConsumed,
+        OysterReceiptReferenced: OysterReceiptReferenced,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -134,7 +131,8 @@ pub mod GigstarkComputeVerifier {
         pub policy_id: felt252,
         #[key]
         pub audience: ContractAddress,
-        pub program_measurement: felt252,
+        pub program_commitment: felt252,
+        pub zk_verifier: ContractAddress,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -151,9 +149,19 @@ pub mod GigstarkComputeVerifier {
         #[key]
         pub job_id: felt252,
         #[key]
-        pub scope_nullifier: felt252,
-        pub result_commitment: felt252,
+        pub nullifier: felt252,
+        pub result_commitment: u256,
         pub outcome: u8,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct OysterReceiptReferenced {
+        #[key]
+        pub policy_id: felt252,
+        #[key]
+        pub job_id: felt252,
+        pub receipt_commitment: u256,
+        pub expected_user_data_binding: felt252,
     }
 
     #[constructor]
@@ -172,139 +180,149 @@ pub mod GigstarkComputeVerifier {
             self.policies.read(policy_id)
         }
 
-        fn is_nullifier_used(
-            self: @ContractState, policy_id: felt252, scope_nullifier: felt252,
-        ) -> bool {
-            self.used_nullifiers.read(nullifier_key(policy_id, scope_nullifier))
+        fn is_nullifier_used(self: @ContractState, nullifier: felt252) -> bool {
+            self.used_nullifiers.read(nullifier)
         }
 
-        fn get_result_digest(self: @ContractState, receipt: GigstarkComputeReceipt) -> felt252 {
-            let policy = self.policies.read(receipt.policy_id);
-            assert(policy.tee_attestor_public_key != 0, errors::INVALID_POLICY);
-            result_digest(get_contract_address(), get_tx_info().unbox().chain_id, policy, receipt)
+        fn get_result_nullifier(self: @ContractState, result: GigstarkZkResult) -> felt252 {
+            result_nullifier(result)
+        }
+
+        fn get_oyster_binding(self: @ContractState, result: GigstarkZkResult) -> felt252 {
+            oyster_binding(get_contract_address(), get_tx_info().unbox().chain_id, result)
         }
 
         fn consume_result(
             ref self: ContractState,
             expected_job_id: felt252,
             expected_input_commitment: felt252,
-            receipt: GigstarkComputeReceipt,
+            result: GigstarkZkResult,
+            full_proof_with_hints: Span<felt252>,
         ) -> u8 {
-            let policy = self.policies.read(receipt.policy_id);
-            assert(policy.tee_attestor_public_key != 0, errors::INVALID_POLICY);
+            let policy = self.policies.read(result.policy_id);
+            assert(policy.zk_verifier.is_non_zero(), errors::INVALID_POLICY);
             assert(policy.active, errors::POLICY_INACTIVE);
-            assert(
-                policy.tee_attestor_public_key != policy.zk_verifier_public_key,
-                errors::SAME_AUTHORITY,
-            );
 
             let now = get_block_timestamp();
             assert(now >= policy.valid_from && now < policy.valid_until, errors::POLICY_EXPIRED);
             assert(get_caller_address() == policy.audience, errors::AUDIENCE_MISMATCH);
-            assert(receipt.audience == policy.audience, errors::AUDIENCE_MISMATCH);
-            assert(receipt.job_id == expected_job_id, errors::JOB_MISMATCH);
-            assert(receipt.input_commitment == expected_input_commitment, errors::INPUT_MISMATCH);
+            assert(result.audience == policy.audience, errors::AUDIENCE_MISMATCH);
+            assert(result.job_id == expected_job_id, errors::JOB_MISMATCH);
+            assert(result.input_commitment == expected_input_commitment, errors::INPUT_MISMATCH);
             assert(
-                receipt.policy_id != 0
-                    && receipt.job_id != 0
-                    && receipt.input_commitment != 0
-                    && receipt.evidence_commitment != 0
-                    && receipt.result_commitment != 0
-                    && receipt.attestation_commitment != 0
-                    && receipt.proof_commitment != 0
-                    && receipt.scope_nullifier != 0
-                    && (receipt.outcome == COMPUTE_OUTCOME_BUYER
-                        || receipt.outcome == COMPUTE_OUTCOME_SELLER),
-                errors::INVALID_RECEIPT,
+                result.policy_id != 0
+                    && result.job_id != 0
+                    && result.input_commitment != 0
+                    && result.evidence_commitment != 0
+                    && result.result_commitment != 0
+                    && (result.outcome == COMPUTE_OUTCOME_BUYER
+                        || result.outcome == COMPUTE_OUTCOME_SELLER),
+                errors::INVALID_RESULT,
             );
             assert(
-                receipt.issued_at >= policy.valid_from
-                    && receipt.issued_at <= now
-                    && receipt.expires_at > now
-                    && receipt.expires_at <= policy.valid_until,
-                errors::RECEIPT_EXPIRED,
+                result.expires_at > now && result.expires_at <= policy.valid_until,
+                errors::RESULT_EXPIRED,
             );
 
-            let key = nullifier_key(receipt.policy_id, receipt.scope_nullifier);
-            assert(!self.used_nullifiers.read(key), errors::NULLIFIER_USED);
+            let nullifier = result_nullifier(result);
+            assert(!self.used_nullifiers.read(nullifier), errors::NULLIFIER_USED);
 
-            let digest = result_digest(
-                get_contract_address(), get_tx_info().unbox().chain_id, policy, receipt,
-            );
-            assert_signature(
-                digest,
-                policy.tee_attestor_public_key,
-                receipt.tee_signature_r,
-                receipt.tee_signature_s,
-                errors::INVALID_TEE_SIGNATURE,
-            );
-            assert_signature(
-                digest,
-                policy.zk_verifier_public_key,
-                receipt.zk_signature_r,
-                receipt.zk_signature_s,
-                errors::INVALID_ZK_SIGNATURE,
+            let proof_result = IGroth16VerifierBN254Dispatcher {
+                contract_address: policy.zk_verifier,
+            }
+                .verify_groth16_proof_bn254(full_proof_with_hints);
+            let public_inputs = match proof_result {
+                Result::Ok(inputs) => inputs,
+                Result::Err(_) => panic_with_felt252(errors::PROOF_REJECTED),
+            };
+            assert(public_inputs.len() == 8, errors::PUBLIC_INPUT_COUNT);
+            assert(
+                *public_inputs.at(0) == result.input_commitment.into()
+                    && *public_inputs.at(1) == result.policy_id.into()
+                    && *public_inputs.at(2) == policy.program_commitment.into()
+                    && *public_inputs.at(3) == policy.required_score.into()
+                    && *public_inputs.at(4) == result.evidence_commitment
+                    && *public_inputs.at(5) == result.result_commitment
+                    && *public_inputs.at(6) == result.outcome.into()
+                    && *public_inputs.at(7) == result.expires_at.into(),
+                errors::PUBLIC_SIGNAL_MISMATCH,
             );
 
-            self.used_nullifiers.write(key, true);
+            self.used_nullifiers.write(nullifier, true);
             self
                 .emit(
                     ResultConsumed {
-                        policy_id: receipt.policy_id,
-                        job_id: receipt.job_id,
-                        scope_nullifier: receipt.scope_nullifier,
-                        result_commitment: receipt.result_commitment,
-                        outcome: receipt.outcome,
+                        policy_id: result.policy_id,
+                        job_id: result.job_id,
+                        nullifier,
+                        result_commitment: result.result_commitment,
+                        outcome: result.outcome,
                     },
                 );
-            receipt.outcome
+            if result.oyster_receipt_commitment != 0 {
+                self
+                    .emit(
+                        OysterReceiptReferenced {
+                            policy_id: result.policy_id,
+                            job_id: result.job_id,
+                            receipt_commitment: result.oyster_receipt_commitment,
+                            expected_user_data_binding: oyster_binding(
+                                get_contract_address(), get_tx_info().unbox().chain_id, result,
+                            ),
+                        },
+                    );
+            }
+            result.outcome
         }
 
         fn set_policy(
             ref self: ContractState,
             policy_id: felt252,
             audience: ContractAddress,
-            program_measurement: felt252,
+            program_commitment: felt252,
             compute_policy_hash: felt252,
+            required_score: u8,
             valid_from: u64,
             valid_until: u64,
-            tee_attestor_public_key: felt252,
-            zk_verifier_public_key: felt252,
+            zk_verifier: ContractAddress,
         ) {
             self.assert_admin();
+            assert(self.policies.read(policy_id).zk_verifier.is_zero(), errors::INVALID_POLICY);
             assert(
                 policy_id != 0
                     && audience.is_non_zero()
-                    && program_measurement != 0
+                    && program_commitment != 0
                     && compute_policy_hash != 0
+                    && required_score <= 100
                     && valid_until > valid_from
-                    && tee_attestor_public_key != 0
-                    && zk_verifier_public_key != 0,
+                    && zk_verifier.is_non_zero(),
                 errors::INVALID_POLICY,
             );
-            assert(tee_attestor_public_key != zk_verifier_public_key, errors::SAME_AUTHORITY);
             self
                 .policies
                 .write(
                     policy_id,
                     GigstarkComputePolicy {
                         audience,
-                        program_measurement,
+                        program_commitment,
                         compute_policy_hash,
+                        required_score,
                         valid_from,
                         valid_until,
-                        tee_attestor_public_key,
-                        zk_verifier_public_key,
+                        zk_verifier,
                         active: true,
                     },
                 );
-            self.emit(PolicyConfigured { policy_id, audience, program_measurement });
+            self
+                .emit(
+                    PolicyConfigured { policy_id, audience, program_commitment, zk_verifier },
+                );
         }
 
         fn set_policy_active(ref self: ContractState, policy_id: felt252, active: bool) {
             self.assert_admin();
             let mut policy = self.policies.read(policy_id);
-            assert(policy.tee_attestor_public_key != 0, errors::INVALID_POLICY);
+            assert(policy.zk_verifier.is_non_zero(), errors::INVALID_POLICY);
             policy.active = active;
             self.policies.write(policy_id, policy);
             self.emit(PolicyStatusChanged { policy_id, active });
@@ -318,43 +336,27 @@ pub mod GigstarkComputeVerifier {
         }
     }
 
-    fn nullifier_key(policy_id: felt252, scope_nullifier: felt252) -> felt252 {
-        poseidon_hash_span([COMPUTE_NULLIFIER_DOMAIN, policy_id, scope_nullifier].span())
+    fn result_nullifier(result: GigstarkZkResult) -> felt252 {
+        poseidon_hash_span(
+            [
+                COMPUTE_NULLIFIER_DOMAIN, result.policy_id, result.audience.into(), result.job_id,
+                result.input_commitment, result.result_commitment.low.into(),
+                result.result_commitment.high.into(), result.outcome.into(), result.expires_at.into(),
+            ]
+                .span(),
+        )
     }
 
-    fn assert_signature(
-        digest: felt252,
-        public_key: felt252,
-        signature_r: felt252,
-        signature_s: felt252,
-        error: felt252,
-    ) {
-        let signature_r_u256: u256 = signature_r.into();
-        let signature_s_u256: u256 = signature_s.into();
-        let curve_order: u256 = STARK_CURVE_ORDER.into();
-        let half_order: u256 = STARK_CURVE_HALF_ORDER.into();
-        assert(
-            signature_r_u256 < curve_order
-                && signature_s_u256 <= half_order
-                && check_ecdsa_signature(digest, public_key, signature_r, signature_s),
-            error,
-        );
-    }
-
-    fn result_digest(
-        verifier: ContractAddress,
-        chain_id: felt252,
-        policy: GigstarkComputePolicy,
-        receipt: GigstarkComputeReceipt,
+    fn oyster_binding(
+        verifier: ContractAddress, chain_id: felt252, result: GigstarkZkResult,
     ) -> felt252 {
         poseidon_hash_span(
             [
-                COMPUTE_RECEIPT_DOMAIN, chain_id, verifier.into(), receipt.policy_id,
-                policy.audience.into(), policy.program_measurement, policy.compute_policy_hash,
-                policy.valid_from.into(), policy.valid_until.into(), receipt.job_id,
-                receipt.input_commitment, receipt.evidence_commitment, receipt.result_commitment,
-                receipt.outcome.into(), receipt.attestation_commitment, receipt.proof_commitment,
-                receipt.scope_nullifier, receipt.issued_at.into(), receipt.expires_at.into(),
+                OYSTER_BINDING_DOMAIN, chain_id, verifier.into(), result.policy_id,
+                result.audience.into(), result.job_id, result.input_commitment,
+                result.evidence_commitment.low.into(), result.evidence_commitment.high.into(),
+                result.result_commitment.low.into(), result.result_commitment.high.into(),
+                result.outcome.into(), result.expires_at.into(),
             ]
                 .span(),
         )

@@ -25,6 +25,7 @@ snforge_std = "0.59.0"
 name = "gigstark_escrow_unittest"
 build-external-contracts = [
   "gigstark_escrow::test_contracts::MockAuthorizationVerifier",
+  "gigstark_escrow::test_contracts::MockGroth16VerifierBN254",
   "starkware_utils::erc20::erc20_mocks::DualCaseERC20Mock",
 ]
 

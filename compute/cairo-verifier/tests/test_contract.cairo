@@ -13,9 +13,16 @@ use gigstark_groth16_verifier::groth16_verifier::{
     IGroth16VerifierBN254DispatcherTrait, IGroth16VerifierBN254LibraryDispatcher,
     IGroth16VerifierBN254SafeDispatcherTrait, IGroth16VerifierBN254SafeLibraryDispatcher,
 };
+use gigstark_escrow::compute_verifier::{
+    COMPUTE_OUTCOME_SELLER, GigstarkZkResult, IGigstarkComputeVerifierDispatcher,
+    IGigstarkComputeVerifierDispatcherTrait,
+};
 use snforge_std::fs::{FileTrait, read_txt};
-use snforge_std::{DeclareResultTrait, declare};
-use starknet::ClassHash;
+use snforge_std::{
+    ContractClassTrait, DeclareResultTrait, declare, start_cheat_block_timestamp,
+    start_cheat_caller_address,
+};
+use starknet::{ClassHash, ContractAddress, SyscallResultTrait};
 
 /// Declare the Groth16VerifierBN254 contract for testing.
 ///
@@ -66,7 +73,7 @@ fn declare_contract(name: ByteArray) -> ClassHash {
 /// - The function should return Ok(public_inputs) containing the expected public inputs
 /// - No panics or assertion failures should occur
 #[test]
-#[fork(url: "https://api.zan.top/public/starknet-sepolia/rpc/v0_10", block_tag: latest)]
+#[fork(url: "https://starknet-sepolia-rpc.publicnode.com", block_tag: latest)]
 fn test_verify_groth16_proof_bn254() {
     // Step 1: Declare the verification contract
     let class_hash = declare_contract("Groth16VerifierBN254");
@@ -103,7 +110,7 @@ fn test_verify_groth16_proof_bn254() {
 
 #[test]
 #[feature("safe_dispatcher")]
-#[fork(url: "https://api.zan.top/public/starknet-sepolia/rpc/v0_10", block_tag: latest)]
+#[fork(url: "https://starknet-sepolia-rpc.publicnode.com", block_tag: latest)]
 fn test_tampered_public_signal_does_not_verify() {
     let class_hash = declare_contract("Groth16VerifierBN254");
     let dispatcher = IGroth16VerifierBN254SafeLibraryDispatcher { class_hash };
@@ -121,4 +128,57 @@ fn test_tampered_public_signal_does_not_verify() {
 
     let result = dispatcher.verify_groth16_proof_bn254(tampered.span());
     assert(result.is_err(), 'Tampered proof accepted');
+}
+
+/// Proves that Gigstark's settlement verifier accepts the generated proof
+/// through the real Garaga verifier contract, not a mock verifier boundary.
+#[test]
+#[fork(url: "https://starknet-sepolia-rpc.publicnode.com", block_tag: latest)]
+fn test_real_proof_authorizes_gigstark_settlement() {
+    let groth16_class = declare(contract: "Groth16VerifierBN254")
+        .unwrap_syscall()
+        .contract_class();
+    let (groth16_address, _) = groth16_class.deploy(@array![]).unwrap_syscall();
+
+    let compute_class = declare(contract: "GigstarkComputeVerifier")
+        .unwrap_syscall()
+        .contract_class();
+    let admin: ContractAddress = 9001.try_into().unwrap();
+    let audience: ContractAddress = 4001.try_into().unwrap();
+    let (compute_address, _) = compute_class.deploy(@array![admin.into()]).unwrap_syscall();
+    let compute = IGigstarkComputeVerifierDispatcher { contract_address: compute_address };
+
+    start_cheat_caller_address(compute_address, admin);
+    compute
+        .set_policy(
+            2001,
+            audience,
+            3001,
+            5001,
+            80,
+            0,
+            2_100_000_000,
+            groth16_address,
+        );
+    start_cheat_block_timestamp(compute_address, 1_900_000_000);
+
+    let result = GigstarkZkResult {
+        policy_id: 2001,
+        audience,
+        job_id: 6001,
+        input_commitment: 1001,
+        evidence_commitment: 12318210310005545467923238974225569704656499382605073888978048422405465896216_u256,
+        result_commitment: 7027575617398834524868433602045773688065798774486261216253352711849780969765_u256,
+        outcome: COMPUTE_OUTCOME_SELLER,
+        expires_at: 2_000_000_000,
+        oyster_receipt_commitment: 333_u256,
+    };
+    let file = FileTrait::new("tests/proof_calldata.txt");
+    let calldata = read_txt(@file);
+
+    start_cheat_caller_address(compute_address, audience);
+    let outcome = compute.consume_result(6001, 1001, result, calldata.span());
+
+    assert_eq!(outcome, COMPUTE_OUTCOME_SELLER);
+    assert(compute.is_nullifier_used(compute.get_result_nullifier(result)), 'Result not consumed');
 }

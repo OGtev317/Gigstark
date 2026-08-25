@@ -41,12 +41,17 @@ action or fund movement was performed.
   and requires a separate acknowledgement before enabling submission.
 - Wallet rejection and wrong-chain states use fail-closed messages and never
   imply that a rejected request produced a transaction.
-- Hybrid compute policies require distinct TEE and ZK authority keys. Both
-  canonical Stark signatures cover the same chain, verifier, audience, policy,
-  program measurement, job, input/evidence/result, outcome, attestation/proof
-  commitments, validity, and scoped nullifier.
-- Compute receipts reject either invalid signature, wrong job or expected input,
-  inactive policy, expiry, and nullifier replay.
+- Compute policies pin an exact Groth16 verifier. Cairo accepts only eight
+  public inputs in the canonical order and compares input, policy, program,
+  threshold, evidence, result, outcome, and expiry before settlement. A
+  configured policy ID cannot be reconfigured; it can only be deactivated or
+  reactivated by the current admin.
+- Compute results reject failed proofs, substituted public signals, wrong job or
+  expected input, inactive policy, expiry, and deterministic-nullifier replay.
+- An Oyster receipt commitment is optional and excluded from settlement
+  authority. If present, Cairo emits the exact expected chain/contract/result
+  `user_data` binding for independent certificate, image-ID, and freshness
+  verification.
 - Escrow dispute resolution derives its expected input commitment from the
   chain, escrow contract, escrow fields, and current action nonce, then consumes
   exactly one compute result. No direct binary arbitrator call remains.
@@ -67,11 +72,13 @@ action or fund movement was performed.
    receipt. It does not directly verify the underlying ZK proof. Issuance,
    proof-verifier operation, attestor key storage/rotation, and compromise
    response are not implemented.
-3. **TEE and ZK receipts are not directly verified yet.** The new contract
-   verifies two policy-pinned Stark approvals, not an AWS Nitro COSE certificate
-   chain or the underlying ZK proof. Vendor root/collateral validation,
-   reproducible non-debug measurements, nonce freshness, direct proof
-   verification, and independent authority operation remain open.
+3. **Production proving and Oyster evidence remain open.** Direct Groth16
+   verification works with a real synthetic fixture, but the deterministic
+   test ceremony and placeholder commitments are not production-safe. No paid
+   Oyster job, immutable published workload image, independently reproduced
+   image ID, workload-controlled `user_data` adapter, or raw attestation bound
+   to the fixture exists yet. A generic endpoint that attests caller-supplied
+   user data would not prove execution of the claimed result.
 4. **Single administrative roles.** Passport and compute policy administration
    are constructor-pinned single addresses in this draft. A reviewed
    multisig/timelock, key rotation, revocation, and emergency policy are
@@ -86,9 +93,10 @@ action or fund movement was performed.
 
 - Helper token, amount, calldata commitments, open-note amounts, timing, and
   the pool/helper interaction remain public.
-- TEE confidentiality depends on the chosen hardware/vendor root, attestation
-  validation, enclave build reproducibility, rollback/freshness controls, and
-  resistance to side channels. A valid signature alone is not hardware proof.
+- Oyster confidentiality depends on AWS Nitro, certificate-root and image-ID
+  verification, build reproducibility, rollback/freshness controls, encrypted
+  evidence transport, and resistance to side channels. A receipt hash alone is
+  not hardware proof and never authorizes settlement.
 - ZK correctness depends on the exact circuit/program, verification key, public
   signal order, proof system, and verifier implementation. Proving the wrong
   policy correctly is still a system failure.
@@ -110,9 +118,9 @@ action or fund movement was performed.
 
 ## Required next review
 
-Do not declare or deploy until the pool source mapping is published, the exact
-TEE platform/measurement and attestation-validation path are reproducible, the
-ZK circuit/program and verification path are fixed, all constructor roles and
+Do not declare or deploy until the pool source mapping is published, the Oyster
+image/measurement and attestation-validation path are reproducible, the
+production ZK setup and verification path are fixed, all constructor roles and
 class hashes are reviewed, an independent Cairo review closes critical/high
 findings, and an explicit Sepolia-only transaction review authorizes the
 account, nonce, fees, and constructor calldata.

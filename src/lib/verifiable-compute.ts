@@ -3,16 +3,16 @@ export type ComputeOutcome = "buyer" | "seller";
 export type GigstarkComputePolicy = {
   id: string;
   audience: string;
-  programMeasurement: string;
+  programCommitment: string;
   computePolicyHash: string;
-  teeAttestorPublicKey: string;
-  zkVerifierPublicKey: string;
+  requiredScore: number;
+  zkVerifierAddress: string;
   validFrom: number;
   validUntil: number;
   active: boolean;
 };
 
-export type GigstarkComputeReceipt = {
+export type GigstarkZkResult = {
   policyId: string;
   audience: string;
   jobId: string;
@@ -20,13 +20,20 @@ export type GigstarkComputeReceipt = {
   evidenceCommitment: string;
   resultCommitment: string;
   outcome: ComputeOutcome;
-  attestationCommitment: string;
-  proofCommitment: string;
-  scopeNullifier: string;
-  issuedAt: number;
   expiresAt: number;
-  teeSignature: string;
-  zkSignature: string;
+  /** Optional raw-attestation bundle hash. It never authorizes settlement. */
+  oysterReceiptCommitment?: string;
+};
+
+export type GigstarkZkPublicSignals = {
+  inputCommitment: string;
+  policyId: string;
+  programCommitment: string;
+  requiredScore: number;
+  evidenceCommitment: string;
+  resultCommitment: string;
+  outcome: ComputeOutcome;
+  expiresAt: number;
 };
 
 export type GigstarkComputeVerifier = {
@@ -39,11 +46,12 @@ export function createComputePolicy(
   if (
     !input.id ||
     !input.audience ||
-    !input.programMeasurement ||
+    !input.programCommitment ||
     !input.computePolicyHash ||
-    !input.teeAttestorPublicKey ||
-    !input.zkVerifierPublicKey ||
-    input.teeAttestorPublicKey === input.zkVerifierPublicKey ||
+    !input.zkVerifierAddress ||
+    !Number.isInteger(input.requiredScore) ||
+    input.requiredScore < 0 ||
+    input.requiredScore > 100 ||
     input.validUntil <= input.validFrom
   ) {
     throw new Error("INVALID_COMPUTE_POLICY");
@@ -55,15 +63,55 @@ export function createComputeVerifier(): GigstarkComputeVerifier {
   return { usedNullifiers: new Set() };
 }
 
+export function getResultNullifier(result: GigstarkZkResult): string {
+  return [
+    "GIG_ZK_NULLIFIER_V1",
+    result.policyId,
+    result.audience,
+    result.jobId,
+    result.inputCommitment,
+    result.resultCommitment,
+    result.outcome,
+    result.expiresAt,
+  ].join(":");
+}
+
 /**
- * Models the public binding and anti-replay checks used by the Cairo verifier.
- * Signature strings are opaque in this browser model; the Cairo contract
- * performs the actual Stark-curve signature verification.
+ * Human-readable mirror of the fields hashed into Oyster attestation
+ * `user_data` by Cairo. Production clients must compute the actual Poseidon
+ * hash with the same field encoding as `GigstarkComputeVerifier`.
  */
-export function verifyComputeReceipt(
+export function getOysterBindingStatement(
+  result: GigstarkZkResult,
+  chainId: string,
+  computeVerifierAddress: string,
+): readonly (string | number)[] {
+  return [
+    "GIG_OYSTER_BIND_V1",
+    chainId,
+    computeVerifierAddress,
+    result.policyId,
+    result.audience,
+    result.jobId,
+    result.inputCommitment,
+    result.evidenceCommitment,
+    result.resultCommitment,
+    result.outcome,
+    result.expiresAt,
+  ];
+}
+
+/**
+ * Browser-state model for the Cairo checks. `proofAccepted` represents the
+ * result returned by the onchain Groth16 verifier; this function does not
+ * perform cryptographic verification itself.
+ */
+export function verifyZkSettlement(
   verifier: GigstarkComputeVerifier,
   policy: GigstarkComputePolicy,
-  receipt: GigstarkComputeReceipt,
+  result: GigstarkZkResult,
+  publicSignals: GigstarkZkPublicSignals,
+  proofAccepted: boolean,
   expectedJobId: string,
   expectedInputCommitment: string,
   now: number,
@@ -71,31 +119,37 @@ export function verifyComputeReceipt(
   if (!policy.active || now < policy.validFrom || now >= policy.validUntil) {
     throw new Error("COMPUTE_POLICY_INACTIVE");
   }
-  if (receipt.policyId !== policy.id || receipt.audience !== policy.audience) {
+  if (result.policyId !== policy.id || result.audience !== policy.audience) {
     throw new Error("COMPUTE_BINDING_MISMATCH");
   }
-  if (receipt.jobId !== expectedJobId || receipt.inputCommitment !== expectedInputCommitment) {
+  if (result.jobId !== expectedJobId || result.inputCommitment !== expectedInputCommitment) {
     throw new Error("COMPUTE_JOB_INPUT_MISMATCH");
   }
   if (
-    !receipt.evidenceCommitment ||
-    !receipt.resultCommitment ||
-    !receipt.attestationCommitment ||
-    !receipt.proofCommitment ||
-    !receipt.scopeNullifier ||
-    !receipt.teeSignature ||
-    !receipt.zkSignature ||
-    (receipt.outcome !== "buyer" && receipt.outcome !== "seller") ||
-    receipt.issuedAt < policy.validFrom ||
-    receipt.issuedAt > now ||
-    receipt.expiresAt <= now ||
-    receipt.expiresAt > policy.validUntil
+    !result.evidenceCommitment ||
+    !result.resultCommitment ||
+    (result.outcome !== "buyer" && result.outcome !== "seller") ||
+    result.expiresAt <= now ||
+    result.expiresAt > policy.validUntil
   ) {
-    throw new Error("INVALID_COMPUTE_RECEIPT");
+    throw new Error("INVALID_COMPUTE_RESULT");
+  }
+  if (!proofAccepted) throw new Error("COMPUTE_BAD_ZK_PROOF");
+  if (
+    publicSignals.inputCommitment !== result.inputCommitment ||
+    publicSignals.policyId !== result.policyId ||
+    publicSignals.programCommitment !== policy.programCommitment ||
+    publicSignals.requiredScore !== policy.requiredScore ||
+    publicSignals.evidenceCommitment !== result.evidenceCommitment ||
+    publicSignals.resultCommitment !== result.resultCommitment ||
+    publicSignals.outcome !== result.outcome ||
+    publicSignals.expiresAt !== result.expiresAt
+  ) {
+    throw new Error("COMPUTE_ZK_BINDING");
   }
 
-  const replayKey = `${policy.id}:${receipt.scopeNullifier}`;
-  if (verifier.usedNullifiers.has(replayKey)) throw new Error("COMPUTE_NULLIFIER_REPLAY");
-  verifier.usedNullifiers.add(replayKey);
-  return receipt.outcome;
+  const nullifier = getResultNullifier(result);
+  if (verifier.usedNullifiers.has(nullifier)) throw new Error("COMPUTE_NULLIFIER_REPLAY");
+  verifier.usedNullifiers.add(nullifier);
+  return result.outcome;
 }

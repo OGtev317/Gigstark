@@ -6,8 +6,8 @@ official StarkWare escrow package.
 
 The package builds stateful `GigstarkEscrow` and `GigstarkSubscriptions`
 contracts, a `GigstarkPassportVerifier`, and an audience-bound
-`GigstarkTierGate`. The package also builds `GigstarkComputeVerifier`, the new
-hybrid TEE+ZK result-verification boundary. The escrow constructor pins the
+`GigstarkTierGate`. The package also builds `GigstarkComputeVerifier`, the
+direct-ZK result-verification boundary with an optional Oyster receipt. The escrow constructor pins the
 privacy pool, compute verifier, and an external action-
 authorization verifier. The pool-only `privacy_invoke` route covers deposit,
 delivery, buyer confirmation, dispute opening, timeout refund, and one winner
@@ -30,16 +30,16 @@ Gigstark code and imports no Athera contract, root, trust, or network state. It
 is a signed receipt verifier for an opaque proof accepted off-chain, not a
 direct ZK circuit verifier.
 
-`GigstarkComputeVerifier` requires two distinct, policy-pinned Stark keys to
-approve the same result statement: one represents a TEE measurement/attestation
-authority, and the other represents a ZK proof verifier. The receipt binds
-chain, verifier, audience, program measurement, computation policy, job,
-expected input, evidence/result commitments, binary outcome, attestation/proof
-commitments, validity, and a one-use nullifier. It verifies both canonical
-signatures; it does not yet parse a vendor certificate/COSE chain or directly
-verify the underlying ZK proof. The escrow now derives an exact dispute-input
-commitment from its state and consumes one compute result to select the buyer or
-seller outcome.
+`GigstarkComputeVerifier` calls the Groth16 verifier address pinned by the
+active policy. It requires exactly eight returned public inputs to match the
+expected escrow input, policy, program, score threshold, evidence/result
+commitments, binary outcome, and expiry. Its one-use nullifier is derived from
+the result instead of supplied by the caller, and configured policy IDs cannot
+be overwritten with different verification rules. An optional Oyster attestation
+bundle hash can be emitted beside the exact expected `user_data` binding, but
+that hash is not checked as a settlement prerequisite and cannot alter the ZK
+outcome. The escrow derives its dispute input from chain, contract, escrow
+state, and action nonce before consuming the result.
 
 Subscriptions support one initial period, at most three total prepaid periods,
 cancellation, expiry, and one creator note per paid period. Claims unlock when
@@ -56,7 +56,7 @@ scarb build
 snforge test
 ```
 
-The dependency lock must remain checked in. Thirty-four contract tests pass
+The dependency lock must remain checked in. Thirty-six contract tests pass
 locally with the pinned toolchain, but this is not a deployment approval.
 
 The exact upstream release, live pool mismatch, and deployment gate are in

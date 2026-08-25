@@ -1,9 +1,10 @@
 # Gigstark
 
 Gigstark is a local, non-custodial STRK20 prototype for private freelance
-milestones and creator subscriptions on Starknet. Its new center is hybrid
-verifiable computation: TEEs protect sensitive evaluation while ZK proofs bind
-the result to an explicit policy. It is a standalone project and does not use
+milestones and creator subscriptions on Starknet. Its settlement center is a
+directly verified ZK proof. Marlin Oyster can add a separately verifiable TEE
+receipt for confidential execution, but that optional receipt cannot authorize,
+block, or override settlement. It is a standalone project and does not use
 Athera L1 or L3.
 
 ## What runs now
@@ -15,12 +16,16 @@ Athera L1 or L3.
 - GigstarkPassport: a new minimum-disclosure, purpose-bound claim policy model with opaque proof commitments and scoped replay protection.
 - A clean-room Cairo passport receipt verifier connected to escrow role
   authorization and an audience-bound tier gate.
-- A clean-room `GigstarkComputeVerifier` requiring independent TEE and ZK
-  approvals over the same audience/job/input/result statement, with expiry,
-  revocation, canonical signatures, and nullifier replay protection.
-- A pinned AWS Nitro Enclaves dispute program, a real BN254 Groth16 proof over
-  one synthetic seller-winning dispute, and a Garaga `1.1.0` Cairo verifier
-  whose tests accept the exact eight public signals and reject tampering.
+- A clean-room `GigstarkComputeVerifier` that directly calls a policy-pinned
+  BN254 Groth16 verifier, checks all eight public signals, derives a one-use
+  result nullifier, and treats an Oyster receipt commitment as optional
+  non-authoritative evidence.
+- A real BN254 Groth16 proof over one synthetic seller-winning dispute and a
+  Garaga `1.1.0` Cairo verifier whose integration test authorizes the real
+  Gigstark settlement verifier and whose negative test rejects tampering.
+- A Mac-compatible Oyster receipt lane pinned to `oyster-cvm 5.0.1`, with an
+  immutable-image requirement and offline certificate, freshness, image-ID,
+  and `user_data` verification command. No Oyster job has been deployed.
 - A Wallet API preparation layer for private `withdraw -> invoke` deposits and
   `open transfer -> invoke` winner claims, guarded by exact pool address and
   class checks.
@@ -63,12 +68,12 @@ Open `http://localhost:3000`.
 
 `contracts/` contains a Sepolia-only, stateful Cairo anonymizer draft with a
 pool-only `privacy_invoke`, balance accounting, cryptographic receipt-based role
-authorization, hybrid compute resolution, bounded prepaid subscriptions, tier
+authorization, direct-ZK compute resolution, bounded prepaid subscriptions, tier
 proof consumption, and one reviewed `OpenNoteDeposit` return per valid claim.
-Thirty-four escrow-package contract tests run locally. A separate generated
-Garaga verifier now validates the synthetic dispute proof on a read-only
-Sepolia fork, but it is not yet wired into escrow settlement. Independent
-review, production proving setup, Nitro EIF measurement and attestation,
+Thirty-six escrow-package contract tests run locally. The generated Garaga
+verifier validates the synthetic dispute proof on a read-only Sepolia fork and
+now drives the real `GigstarkComputeVerifier` in an integration test. Independent
+review, production proving setup, an Oyster image/attestation receipt,
 issuer/attestor governance, live Wallet API execution, and the live pool's
 upgraded class artifact reproduction remain unresolved. The live ABI and declaration
 timeline now narrow the source candidate to StarkWare commit `5bf8aae`, but its

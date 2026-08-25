@@ -6,10 +6,10 @@ BN254 Groth16 proof in `../zk/fixtures/proof.json`. The Starknet calldata in
 `tests/proof_calldata.txt` was generated from that proof and the eight public
 signals in `../zk/fixtures/public.json`.
 
-The package is intentionally separate from `contracts/`: Garaga `1.1.0` was
-generated for Cairo `2.16.1`, while the reviewed Gigstark package is pinned to
-Cairo `2.17.0`. This specimen has been compiled and tested on Cairo `2.17.0`
-without changing the escrow dependency graph.
+The generated package remains separate from `contracts/`, while its test-only
+dependency imports the reviewed Gigstark contract. This lets the fixture prove
+that the actual Garaga verifier can authorize `GigstarkComputeVerifier` without
+adding Garaga to the escrow package's production dependency graph.
 
 ## Verify
 
@@ -23,8 +23,9 @@ snforge test
 The test uses a read-only Starknet Sepolia fork because the generated verifier
 calls Garaga's declared ECIP operations library at class hash
 `0x396d5915ecf475aab117bb25a0272b261e9e25ffe1c0ce05a51a3f77489c89e`.
-It performs no deployment or transaction. The test asserts all eight returned
-public signals, including the seller outcome (`2`) and expiry.
+It performs no deployment or transaction. Three tests assert all eight returned
+public signals, reject a tampered signal, and pass the real proof through the
+actual Gigstark settlement verifier, including replay consumption.
 
 ## Reproduce the generated source and calldata
 

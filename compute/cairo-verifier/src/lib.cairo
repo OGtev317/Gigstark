@@ -2,3 +2,8 @@
 
 pub mod groth16_verifier;
 pub mod groth16_verifier_constants;
+
+#[cfg(test)]
+#[path("../tests/test_contract.cairo")]
+// The integration target imports both the generated and Gigstark verifiers.
+mod test_contract;

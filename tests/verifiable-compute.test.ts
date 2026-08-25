@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   createComputePolicy,
   createComputeVerifier,
-  verifyComputeReceipt,
-  type GigstarkComputeReceipt,
+  getOysterBindingStatement,
+  verifyZkSettlement,
+  type GigstarkZkPublicSignals,
+  type GigstarkZkResult,
 } from "../src/lib/verifiable-compute";
 
 const now = 1_900;
@@ -12,15 +14,15 @@ const policy = () =>
   createComputePolicy({
     id: "gigstark:compute:dispute:v1",
     audience: "gigstark:escrow",
-    programMeasurement: "measurement:nitro-eif:v1",
+    programCommitment: "program:gigstark-dispute-v1",
     computePolicyHash: "policy:freelance-dispute:v1",
-    teeAttestorPublicKey: "stark-key:tee",
-    zkVerifierPublicKey: "stark-key:zk",
+    requiredScore: 80,
+    zkVerifierAddress: "starknet:groth16-verifier",
     validFrom: 1_800,
     validUntil: 2_000,
   });
 
-const receipt = (): GigstarkComputeReceipt => ({
+const result = (): GigstarkZkResult => ({
   policyId: "gigstark:compute:dispute:v1",
   audience: "gigstark:escrow",
   jobId: "escrow:42",
@@ -28,153 +30,107 @@ const receipt = (): GigstarkComputeReceipt => ({
   evidenceCommitment: "evidence:private-bundle",
   resultCommitment: "result:buyer-wins",
   outcome: "buyer",
-  attestationCommitment: "attestation:vendor-quote",
-  proofCommitment: "proof:policy-execution",
-  scopeNullifier: "compute:once:42",
-  issuedAt: 1_890,
   expiresAt: 1_950,
-  teeSignature: "signature:tee",
-  zkSignature: "signature:zk",
 });
 
-test("accepts one TEE plus ZK bound compute result", () => {
+const signals = (): GigstarkZkPublicSignals => ({
+  inputCommitment: result().inputCommitment,
+  policyId: result().policyId,
+  programCommitment: policy().programCommitment,
+  requiredScore: policy().requiredScore,
+  evidenceCommitment: result().evidenceCommitment,
+  resultCommitment: result().resultCommitment,
+  outcome: result().outcome,
+  expiresAt: result().expiresAt,
+});
+
+const verify = (
+  verifier = createComputeVerifier(),
+  zkResult = result(),
+  publicSignals = signals(),
+  proofAccepted = true,
+) =>
+  verifyZkSettlement(
+    verifier,
+    policy(),
+    zkResult,
+    publicSignals,
+    proofAccepted,
+    "escrow:42",
+    "input:escrow-state-and-evidence-root",
+    now,
+  );
+
+test("a valid ZK proof is the sole settlement authority and cannot replay", () => {
   const verifier = createComputeVerifier();
-  assert.equal(
-    verifyComputeReceipt(
-      verifier,
-      policy(),
-      receipt(),
-      "escrow:42",
-      "input:escrow-state-and-evidence-root",
-      now,
-    ),
-    "buyer",
-  );
-  assert.throws(
-    () =>
-      verifyComputeReceipt(
-        verifier,
-        policy(),
-        receipt(),
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /COMPUTE_NULLIFIER_REPLAY/,
-  );
+  assert.equal(verify(verifier), "buyer");
+  assert.throws(() => verify(verifier), /COMPUTE_NULLIFIER_REPLAY/);
 });
 
-test("requires independent TEE and ZK authorities", () => {
+test("rejects a failed proof or substituted public signal", () => {
   assert.throws(
-    () =>
-      createComputePolicy({
-        ...policy(),
-        teeAttestorPublicKey: "same-key",
-        zkVerifierPublicKey: "same-key",
-      }),
-    /INVALID_COMPUTE_POLICY/,
+    () => verify(createComputeVerifier(), result(), signals(), false),
+    /COMPUTE_BAD_ZK_PROOF/,
+  );
+  assert.throws(
+    () => verify(createComputeVerifier(), result(), { ...signals(), outcome: "seller" }),
+    /COMPUTE_ZK_BINDING/,
   );
 });
 
 test("rejects wrong audience, job, or committed input", () => {
   assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        { ...receipt(), audience: "another-contract" },
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
+    () => verify(createComputeVerifier(), { ...result(), audience: "another-contract" }),
     /COMPUTE_BINDING_MISMATCH/,
   );
   assert.throws(
     () =>
-      verifyComputeReceipt(
+      verifyZkSettlement(
         createComputeVerifier(),
         policy(),
-        receipt(),
+        result(),
+        signals(),
+        true,
         "escrow:43",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /COMPUTE_JOB_INPUT_MISMATCH/,
-  );
-  assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        receipt(),
-        "escrow:42",
-        "input:substituted",
+        result().inputCommitment,
         now,
       ),
     /COMPUTE_JOB_INPUT_MISMATCH/,
   );
 });
 
-test("requires both attestation and proof approvals", () => {
-  assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        { ...receipt(), teeSignature: "" },
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /INVALID_COMPUTE_RECEIPT/,
+test("Oyster receipt is optional and cannot alter settlement", () => {
+  assert.equal(verify(), "buyer");
+  assert.equal(
+    verify(createComputeVerifier(), { ...result(), oysterReceiptCommitment: "sha256:receipt-a" }),
+    "buyer",
   );
-  assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        { ...receipt(), zkSignature: "" },
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /INVALID_COMPUTE_RECEIPT/,
+  assert.equal(
+    verify(createComputeVerifier(), { ...result(), oysterReceiptCommitment: "sha256:receipt-b" }),
+    "buyer",
   );
-  assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        { ...receipt(), outcome: "abstain" as GigstarkComputeReceipt["outcome"] },
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /INVALID_COMPUTE_RECEIPT/,
-  );
+  assert.deepEqual(getOysterBindingStatement(result(), "SN_SEPOLIA", "0xcompute").slice(0, 3), [
+    "GIG_OYSTER_BIND_V1",
+    "SN_SEPOLIA",
+    "0xcompute",
+  ]);
 });
 
-test("rejects expired receipts and revoked policies", () => {
+test("rejects expired results and revoked policies", () => {
   assert.throws(
-    () =>
-      verifyComputeReceipt(
-        createComputeVerifier(),
-        policy(),
-        { ...receipt(), expiresAt: now },
-        "escrow:42",
-        "input:escrow-state-and-evidence-root",
-        now,
-      ),
-    /INVALID_COMPUTE_RECEIPT/,
+    () => verify(createComputeVerifier(), { ...result(), expiresAt: now }),
+    /INVALID_COMPUTE_RESULT/,
   );
   assert.throws(
     () =>
-      verifyComputeReceipt(
+      verifyZkSettlement(
         createComputeVerifier(),
         { ...policy(), active: false },
-        receipt(),
+        result(),
+        signals(),
+        true,
         "escrow:42",
-        "input:escrow-state-and-evidence-root",
+        result().inputCommitment,
         now,
       ),
     /COMPUTE_POLICY_INACTIVE/,

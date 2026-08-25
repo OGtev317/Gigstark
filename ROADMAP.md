@@ -4,9 +4,9 @@ Last reviewed: 2026-08-24
 
 Gigstark is a standalone Starknet and STRK20 project for private freelance
 milestones, creator subscriptions, and proof-gated access. Its strategic center
-is now hybrid verifiable computation: TEEs protect private evaluation and ZK
-proofs bind results to explicit policies before Starknet settlement. It does not
-use Athera L1 or L3 contracts. Development remains local and Sepolia-only until
+is now direct ZK settlement with an optional, independently verifiable Oyster
+TEE receipt for confidential execution evidence. Oyster never becomes a second
+settlement authority. It does not use Athera L1 or L3 contracts. Development remains local and Sepolia-only until
 the contract, wallet, privacy, and operational gates below are complete.
 
 ## Status legend
@@ -25,11 +25,11 @@ reviewed Cairo contract and a privacy-enabled user wallet:
 2. The seller submits a delivery commitment.
 3. The buyer confirms delivery and the seller receives exactly one private
    note.
-4. A dispute variant commits private evidence to an approved TEE job.
-5. The TEE attestation and ZK policy proof bind the same job, input, result, and
-   outcome.
-6. Cairo accepts the hybrid compute result once and resolves to the seller or
-   buyer without publishing evidence.
+4. A dispute variant produces a ZK proof over the committed private evidence.
+5. Cairo directly verifies the proof and binds its eight public signals to the
+   exact job, input, policy, result, outcome, and expiry.
+6. An independently verifiable Oyster receipt may attest to the same program and
+   result, but is not required for Cairo to resolve the seller or buyer.
 7. Replayed compute receipts, actions, and double claims fail.
 8. A one-period subscription and audience-bound tier proof work as the second
    demo.
@@ -47,7 +47,7 @@ definition of done by themselves.
 - State accurately that helper amounts and timing can remain observable.
 - Keep autonomous recurring charges disabled.
 - Maintain local TypeScript models for escrow, subscriptions, tier access,
-  GigstarkPassport, and hybrid TEE+ZK compute policy binding.
+  GigstarkPassport, direct ZK compute binding, and optional Oyster receipts.
 - Verify the production web build, TypeScript checks, tests, and dependency
   audit.
 
@@ -74,7 +74,7 @@ Current progress:
 - The RC.0 privacy contract source and `OpenNoteDeposit` type are locked to an
   exact upstream commit.
 - A non-empty `GigstarkEscrow` contract artifact is generated.
-- Pool caller, collateral accounting, hybrid compute resolution, expiry,
+- Pool caller, collateral accounting, direct-ZK compute resolution, expiry,
   seller/buyer winner, role authorization, replay, approval, and double-claim
   tests pass locally.
 - The live Sepolia pool address currently reports an upgraded class hash that
@@ -91,12 +91,11 @@ Current progress:
   receipts, then exits nonzero because source reproduction remains incomplete.
 - The clean-room `GigstarkPassportVerifier` is connected to buyer/seller action
   authorization and cryptographically verifies action-bound signed receipts.
-- Thirty-four Cairo tests pass across escrow, passport, hybrid compute,
+- Thirty-six Cairo tests pass across escrow, passport, direct-ZK compute,
   subscriptions, and tier access.
-- The clean-room `GigstarkComputeVerifier` requires distinct TEE and ZK
-  authorities to sign the same chain/audience/policy/job/input/result receipt
-  and enforces expiry, revocation, canonical signatures, and nullifier replay
-  protection.
+- The clean-room `GigstarkComputeVerifier` calls a policy-pinned Groth16
+  verifier, matches all eight public signals, derives its replay nullifier, and
+  emits an optional non-authoritative Oyster receipt reference.
 - Escrow, subscription, and tier consumers enforce distinct Passport purposes
   before calling the verifier, preventing cross-purpose policy mistakes.
 
@@ -125,7 +124,8 @@ Current progress:
   dispute, timeout, and winner claim without exposing role identities.
 - Enforce buyer and seller authorization through action-bound role commitments
   and consumed GigstarkPassport proof receipts. Dispute outcomes must consume a
-  TEE+ZK compute receipt bound to the exact escrow state and evidence root.
+  direct ZK proof bound to the exact escrow state and evidence root. An Oyster
+  receipt may reference the same result but cannot select the outcome.
 - Verify that the helper token balance covers the previously accounted balance
   plus the requested deposit amount. Unsolicited surplus must remain
   unaccounted rather than block or inflate an escrow.
@@ -217,45 +217,48 @@ moving production funds.
 - Add Wallet API preparation and UI review for period payment and creator
   claims after the escrow end-to-end flow is cleared.
 
-## Milestone 5 — hybrid TEE + ZK verifiable compute
+## Milestone 5 — ZK settlement plus Oyster receipt
 
-**Status: Real proof/Cairo specimen complete locally; Nitro hardware attestation and escrow wiring remain**
+**Status: Direct real-proof settlement complete locally; live Oyster receipt and production proving remain**
 
-- `GigstarkComputeVerifier` pins the audience, program-measurement commitment,
-  computation-policy hash, validity window, TEE authority, and a distinct ZK
-  verifier authority.
-- Both authorities sign the same chain-bound receipt containing job, expected
-  input, evidence, result, outcome, attestation, proof, expiry, and nullifier
-  commitments.
-- Cairo tests cover valid buyer/seller consumption, replay, bad TEE approval,
-  bad ZK approval, wrong audience/job/input, expiry, and policy revocation.
-- The TypeScript model covers public binding and replay only; it does not claim
-  to verify signatures, hardware quotes, or proofs.
-- AWS Nitro Enclaves and Nitro CLI `1.5.0` are pinned. The static Rust
-  `linux/amd64` container, non-debug EIF recipe, PCR checks, nonce freshness,
-  certificate-chain requirements, and attested public-key boundary are
-  documented. A real EIF/PCR/attestation still requires a Linux Nitro host.
+- `GigstarkComputeVerifier` pins the audience, program commitment,
+  computation-policy hash, threshold, validity window, and exact Groth16
+  verifier contract.
+- A valid proof is the only settlement authority. Cairo compares all eight
+  public signals, derives the result nullifier, and rejects proof failure,
+  substitution, expiry, revocation, wrong audience/job/input, and replay.
+- The Garaga `1.1.0` verifier accepts the real BN254 fixture and rejects a
+  tampered signal on a read-only Sepolia fork. A third integration test passes
+  that proof through the actual Gigstark verifier and consumes the result.
+- `GigstarkEscrow.resolve_dispute` derives the expected input from chain,
+  contract, escrow state, and action nonce, then maps the verified outcome to
+  the buyer or seller. The fast escrow suite uses a mock only at the Groth16
+  boundary; the separate fixture test crosses the real boundary.
+- The TypeScript model mirrors public binding and replay checks while explicitly
+  treating `proofAccepted` as an onchain result, not browser cryptography.
+- `oyster-cvm 5.0.1` for Apple Silicon is pinned by SHA-256. The optional
+  receipt workflow requires the AWS Nitro root, recency, immutable image ID,
+  AMD64 architecture, and exact Cairo-derived `user_data` binding.
+- Oyster receipt absence or invalidity cannot authorize, block, or change ZK
+  settlement. Cairo emits only the optional raw-bundle hash and expected user
+  data binding for independent review.
+- The remaining Oyster adapter must derive attestation `user_data` inside the
+  workload from the computed result. It must not attest an arbitrary binding
+  supplied by an external caller.
 - The canonical synthetic dispute computation and eight-signal Groth16
-  statement are implemented. The production statement must additionally bind
-  chain, compute verifier, escrow audience, policy, program measurement, escrow
-  ID, action nonce, role/delivery commitments, evidence root, outcome, result
-  commitment, and expiry.
-- A Garaga `1.1.0` direct Cairo verifier accepts the real BN254 Groth16 fixture
-  and rejects a tampered public signal on a read-only Sepolia fork. Its current
-  deterministic local ceremony and placeholder dispute identifiers are
-  test-only; review, a production setup, calldata limits, and escrow integration
-  remain required before replacing the ZK receipt authority.
-- `GigstarkEscrow.resolve_dispute` derives the expected input commitment from
-  chain, contract, escrow state, and action nonce, consumes exactly one compute
-  result, and maps its outcome to the buyer or seller.
-- Keep all STRK20 spending/viewing keys and wallet note state outside the TEE.
+  statement are implemented. The deterministic local ceremony and placeholder
+  commitments remain test-only.
+- Keep all STRK20 spending/viewing keys, wallet note state, identities, and real
+  dispute evidence outside the repository and browser. Real Oyster evidence
+  ingestion additionally requires an authenticated encrypted adapter.
 
 ### Milestone 5 exit gate
 
-A reproducible non-debug enclave measurement, freshly validated vendor
-attestation, valid ZK proof, and Cairo-consumed result must all bind the same
-test dispute. Wrong measurement, stale nonce, wrong audience/job/input/outcome,
-either missing approval, revocation, and replay must fail.
+A production-safe circuit setup, reviewed verifying key, valid ZK proof, and
+Cairo-consumed result must bind the same test dispute. Separately, a reproducible
+Oyster image and freshly validated raw attestation must bind that result in
+`user_data`. Wrong public signals, image ID, user data, stale receipt, expiry,
+revocation, and replay must fail. Oyster failure must not change ZK settlement.
 
 ## Milestone 6 — GigstarkPassport
 
@@ -309,8 +312,8 @@ the only planned recurring-payment mechanism before that review.
   token and amount are public settlement fields.
 - No claim is made that STRK20 helper amounts or timing are cryptographically
   hidden.
-- No claim is made that the current dual-signed compute receipt directly
-  verifies a vendor attestation chain or underlying ZK proof.
+- No claim is made that an Oyster receipt authorizes settlement. Only the
+  policy-pinned Groth16 verifier can do so.
 - No TEE may receive a STRK20 spending key, viewing key, or wallet note state.
 - No conversation transcript, secret, private witness, key, seed phrase, or
   identity document belongs in the repository.

@@ -1,9 +1,6 @@
 use core::num::traits::Zero;
 use openzeppelin::interfaces::token::erc20::{IERC20Dispatcher, IERC20DispatcherTrait};
 use privacy::objects::OpenNoteDeposit;
-use snforge_std::signature::stark_curve::{
-    StarkCurveKeyPair, StarkCurveKeyPairImpl, StarkCurveSignerImpl,
-};
 use snforge_std::{
     ContractClassTrait, CustomToken, DeclareResultTrait, Token, TokenTrait, declare,
     start_cheat_block_timestamp, stop_cheat_block_timestamp,
@@ -14,7 +11,7 @@ use starkware_utils_testing::test_utils::{
     cheat_caller_address_once,
 };
 use super::super::compute_verifier::{
-    COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER, GigstarkComputeReceipt,
+    COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER, GigstarkZkResult,
     IGigstarkComputeVerifierDispatcher, IGigstarkComputeVerifierDispatcherTrait,
 };
 use super::super::gigstark_passport::PASSPORT_PURPOSE_ESCROW_ROLE;
@@ -32,17 +29,14 @@ use super::super::{
 const PRIVACY_POOL: felt252 = 'PRIVACY_POOL';
 const COMPUTE_ADMIN: felt252 = 'COMPUTE_ADMIN';
 const COMPUTE_POLICY: felt252 = 'DISPUTE_COMPUTE';
-const PROGRAM_MEASUREMENT: felt252 = 'ENCLAVE_IMAGE_V1';
+const PROGRAM_COMMITMENT: felt252 = 'DISPUTE_PROGRAM_V1';
 const COMPUTE_POLICY_HASH: felt252 = 'DISPUTE_POLICY_V1';
+const REQUIRED_SCORE: u8 = 80;
 const BUYER_COMMITMENT: felt252 = 'BUYER_ROLE';
 const SELLER_COMMITMENT: felt252 = 'SELLER_ROLE';
 const ESCROW_ID: felt252 = 'ESCROW_ONE';
 const AMOUNT: u128 = 100;
 const DEADLINE: u64 = 1_000;
-const STARK_CURVE_ORDER: felt252 =
-    0x800000000000010ffffffffffffffffb781126dcae7b2321e66a241adc64d2f;
-const STARK_CURVE_HALF_ORDER: felt252 =
-    0x4000000000000087fffffffffffffffdbc08936e573d9190f335120d6e32697;
 
 fn mock_proof(authorization_digest: felt252) -> GigstarkPassportProof {
     let mut proof = empty_gigstark_passport_proof();
@@ -58,8 +52,6 @@ struct TestContext {
     verifier_address: ContractAddress,
     compute_verifier_address: ContractAddress,
     token: Token,
-    tee_attestor: StarkCurveKeyPair,
-    zk_verifier: StarkCurveKeyPair,
 }
 
 #[generate_trait]
@@ -90,36 +82,21 @@ impl TestContextImpl of TestContextTrait {
         IGigstarkComputeVerifierDispatcher { contract_address: *self.compute_verifier_address }
     }
 
-    fn signed_compute_receipt(
-        self: @TestContext, outcome: u8, scope_nullifier: felt252,
-    ) -> GigstarkComputeReceipt {
+    fn zk_result(
+        self: @TestContext, outcome: u8, oyster_receipt_commitment: u256,
+    ) -> GigstarkZkResult {
         let input_commitment = self.escrow().get_dispute_input_commitment(ESCROW_ID);
-        let mut receipt = GigstarkComputeReceipt {
+        GigstarkZkResult {
             policy_id: COMPUTE_POLICY,
             audience: *self.escrow_address,
             job_id: ESCROW_ID,
             input_commitment,
-            evidence_commitment: 'PRIVATE_EVIDENCE_HASH',
-            result_commitment: 'COMPUTE_RESULT_HASH',
+            evidence_commitment: 111_u256,
+            result_commitment: 222_u256,
             outcome,
-            attestation_commitment: 'TEE_ATTESTATION_HASH',
-            proof_commitment: 'ZK_PROOF_HASH',
-            scope_nullifier,
-            issued_at: 0,
             expires_at: 100,
-            tee_signature_r: 0,
-            tee_signature_s: 0,
-            zk_signature_r: 0,
-            zk_signature_s: 0,
-        };
-        let digest = self.compute_verifier().get_result_digest(receipt);
-        let (tee_r, tee_s) = self.tee_attestor.sign(digest).unwrap();
-        let (zk_r, zk_s) = self.zk_verifier.sign(digest).unwrap();
-        receipt.tee_signature_r = tee_r;
-        receipt.tee_signature_s = canonical_s(tee_s);
-        receipt.zk_signature_r = zk_r;
-        receipt.zk_signature_s = canonical_s(zk_s);
-        receipt
+            oyster_receipt_commitment,
+        }
     }
 
     fn invoke(
@@ -207,8 +184,10 @@ fn setup() -> TestContext {
         .contract_class();
     let (verifier_address, _) = verifier_class.deploy(@array![]).unwrap_syscall();
 
-    let tee_attestor = StarkCurveKeyPairImpl::from_secret_key('ESCROW_TEE_SECRET');
-    let zk_verifier = StarkCurveKeyPairImpl::from_secret_key('ESCROW_ZK_SECRET');
+    let groth16_class = declare(contract: "MockGroth16VerifierBN254")
+        .unwrap_syscall()
+        .contract_class();
+    let (groth16_address, _) = groth16_class.deploy(@array![]).unwrap_syscall();
     let compute_class = declare(contract: "GigstarkComputeVerifier")
         .unwrap_syscall()
         .contract_class();
@@ -230,12 +209,12 @@ fn setup() -> TestContext {
         .set_policy(
             COMPUTE_POLICY,
             escrow_address,
-            PROGRAM_MEASUREMENT,
+            PROGRAM_COMMITMENT,
             COMPUTE_POLICY_HASH,
+            REQUIRED_SCORE,
             0,
             2_000,
-            tee_attestor.public_key,
-            zk_verifier.public_key,
+            groth16_address,
         );
 
     let token_config = TokenConfig {
@@ -257,8 +236,6 @@ fn setup() -> TestContext {
         verifier_address,
         compute_verifier_address,
         token,
-        tee_attestor,
-        zk_verifier,
     }
 }
 
@@ -266,14 +243,20 @@ fn privacy_pool() -> ContractAddress {
     PRIVACY_POOL.try_into().unwrap()
 }
 
-fn canonical_s(signature_s: felt252) -> felt252 {
-    let signature_s_u256: u256 = signature_s.into();
-    let half_order_u256: u256 = STARK_CURVE_HALF_ORDER.into();
-    if signature_s_u256 > half_order_u256 {
-        STARK_CURVE_ORDER - signature_s
-    } else {
-        signature_s
-    }
+fn proof_for(result: GigstarkZkResult) -> Array<felt252> {
+    array![
+        'VALID_ZK_PROOF',
+        result.input_commitment,
+        result.policy_id,
+        PROGRAM_COMMITMENT,
+        REQUIRED_SCORE.into(),
+        result.evidence_commitment.low.into(),
+        result.evidence_commitment.high.into(),
+        result.result_commitment.low.into(),
+        result.result_commitment.high.into(),
+        result.outcome.into(),
+        result.expires_at.into(),
+    ]
 }
 
 #[test]
@@ -518,7 +501,7 @@ fn test_replay_and_double_claim_fail() {
 
 #[test]
 #[feature("safe_dispatcher")]
-fn test_hybrid_compute_receipt_resolves_dispute_to_buyer() {
+fn test_direct_zk_proof_resolves_dispute_to_buyer() {
     let context = setup();
     context.deposit();
     context.authorize(ESCROW_ID, OP_OPEN_DISPUTE, 0, BUYER_COMMITMENT, 'AUTH_DISPUTE');
@@ -538,13 +521,14 @@ fn test_hybrid_compute_receipt_resolves_dispute_to_buyer() {
         );
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).status, STATUS_DISPUTED);
 
-    let receipt = context.signed_compute_receipt(COMPUTE_OUTCOME_BUYER, 'ESCROW_COMPUTE_ONCE');
-    context.escrow().resolve_dispute(ESCROW_ID, receipt);
+    let result = context.zk_result(COMPUTE_OUTCOME_BUYER, 333_u256);
+    let proof = proof_for(result);
+    context.escrow().resolve_dispute(ESCROW_ID, result, proof.span());
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).status, STATUS_BUYER_WINS);
 }
 
 #[test]
-fn test_hybrid_compute_receipt_resolves_dispute_to_seller() {
+fn test_direct_zk_proof_resolves_dispute_to_seller_without_oyster() {
     let context = setup();
     context.deposit();
     context.authorize(ESCROW_ID, OP_OPEN_DISPUTE, 0, BUYER_COMMITMENT, 'AUTH_DISPUTE_SELLER');
@@ -562,8 +546,9 @@ fn test_hybrid_compute_receipt_resolves_dispute_to_seller() {
             0,
             mock_proof('AUTH_DISPUTE_SELLER'),
         );
-    let receipt = context.signed_compute_receipt(COMPUTE_OUTCOME_SELLER, 'ESCROW_COMPUTE_SELLER');
-    context.escrow().resolve_dispute(ESCROW_ID, receipt);
+    let result = context.zk_result(COMPUTE_OUTCOME_SELLER, 0);
+    let proof = proof_for(result);
+    context.escrow().resolve_dispute(ESCROW_ID, result, proof.span());
     assert_eq!(context.escrow().get_escrow(ESCROW_ID).status, STATUS_SELLER_WINS);
 }
 

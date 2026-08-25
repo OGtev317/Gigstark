@@ -4,57 +4,55 @@
 
 Gigstark is a Starknet/STRK20 project. It does not use, call, deploy to, or anchor anything on Athera L1 or L3. The receipt-anchor idea is intentionally deferred; it must not become a pretext for storing identities, amounts, delivery content, or evidence on another chain.
 
-## Strategic center: private, verifiable computation
+## Strategic center: ZK settlement plus an Oyster receipt
 
-Gigstark now combines two verification systems with different jobs:
+The two verification systems have deliberately unequal authority:
 
 ```text
-encrypted evidence + public escrow statement
+private witness + public escrow statement
                   |
                   v
-       approved TEE program measurement
-       evaluates private evidence and policy
+        canonical dispute circuit
                   |
-        attestation commitment + result
-                  |
-                  v
-       ZK policy proof / proof commitment
+          BN254 Groth16 proof
                   |
                   v
-     GigstarkComputeVerifier on Starknet
-   checks exact policy, audience, job, input,
-  expiry, two approvals, and one-use nullifier
+     policy-pinned Garaga verifier
+                  |
+       exact eight-signal comparison
+                  |
+       replay-safe Cairo settlement
                   |
                   v
-       GigstarkEscrow outcome -> STRK20 note
+       GigstarkEscrow -> STRK20 note
+
+optional parallel evidence lane:
+same workload -> Oyster CVM -> raw Nitro attestation
+             -> image ID + recency + user_data verification
+             -> hash-only receipt reference on Starknet
 ```
 
-The TEE supplies confidentiality during evaluation and a hardware-rooted claim
-about the program measurement. The ZK layer supplies a cryptographic statement
-that the committed input and result satisfy the declared computation policy.
-Neither system receives a STRK20 spending key or viewing key.
+The ZK proof is the only authority that selects buyer or seller. The Oyster
+lane supplies a hardware-rooted, independently verifiable claim about the
+program image and bound result, but the receipt is optional and cannot block,
+authorize, or override settlement. This avoids turning Oyster availability or
+AWS Nitro operations into consensus for the hackathon contract.
 
-The current hackathon contract is intentionally an intermediate boundary. It
-verifies two independent, policy-pinned Stark signatures over the exact same
-compute receipt:
+The policy pins the audience, program commitment, computation-policy hash,
+score threshold, validity window, and Groth16 verifier contract. The result
+contains job/input/evidence/result commitments, outcome, expiry, and an optional
+raw-attestation bundle commitment. Cairo derives its replay nullifier from the
+result fields and compares every returned public input before mutating state.
 
-1. A TEE authority key that must be bound to an approved enclave key or a
-   separately validated vendor attestation chain.
-2. A ZK verifier authority key that attests it accepted the opaque proof
-   commitment for the pinned computation policy.
+For Oyster review, Cairo computes `GIG_OYSTER_BIND_V1` over the chain, verifier,
+policy, audience, job, input, evidence, result, outcome, and expiry. That felt is
+encoded as 32-byte big-endian `user_data` in the attestation. Offchain review
+must verify the AWS Nitro root, recency, expected Oyster image ID/measurements,
+architecture, and exact user data before accepting the raw bundle hash.
 
-This is stronger than a single operator receipt, but it is not the same as
-directly verifying an AWS Nitro COSE certificate chain or a ZK proof inside the
-Gigstark contract. The long-term replacement is a reviewed attestation-proof
-adapter plus a direct Cairo/Garaga verifier. The receipt statement is designed
-so those verifiers can replace the two authorities without changing escrow job,
-input, result, expiry, or nullifier semantics.
-
-Only commitments are public: program-measurement commitment, policy hash, job
-ID, input/evidence/result commitments, outcome, attestation commitment, proof
-commitment, expiry, and scoped nullifier. Raw evidence, vendor attestation
-documents, model prompts/weights when private, ZK witnesses, identities, and
-wallet private state remain off-chain.
+Neither lane receives a STRK20 spending key, viewing key, wallet note state, or
+identity document. Only commitments, outcome, expiry, proof calldata, derived
+nullifier, and any optional receipt reference are public.
 
 ## First demo: escrow
 
@@ -63,7 +61,7 @@ buyer STRK20 wallet
   -> private action: pool withdraws funds to GigstarkEscrow
   -> GigstarkEscrow stores only commitments and settlement state
   -> delivery commitment
-  -> buyer confirmation OR TEE+ZK compute outcome OR time-based refund
+  -> buyer confirmation OR ZK compute outcome OR time-based refund
   -> pool credits exactly one open note
 ```
 
@@ -91,13 +89,13 @@ Required pre-deploy checks:
 4. Cairo unit/property tests cover authorization, expiry, duplicate delivery,
    compute-result binding, replays, single settlement, and both double-claim
    paths.
-5. TEE measurement governance, vendor attestation validation, ZK circuit/public
-   signals, and both authority rotations are independently reviewed.
+5. The ZK circuit, verifying key, public-signal order, Oyster image/receipt
+   expectations, and policy administration are independently reviewed.
 6. Independent Cairo/security review and a scoped operational/dispute policy are complete.
 
 The first integration pin is recorded in `contracts/STRK20_SEPOLIA_PIN.md`.
 The project compiles with Cairo 2.17.0 and has non-empty contract artifacts plus
-25 passing Starknet Foundry tests. The live Sepolia pool class does not match
+36 passing Starknet Foundry tests. The live Sepolia pool class does not match
 either of the source-built, reviewed upstream class hashes, so Wallet API
 preparation fails closed and declaration/deployment remain blocked.
 
@@ -149,38 +147,42 @@ and testnet-only review.
 
 ## GigstarkComputeVerifier
 
-`contracts/src/compute_verifier.cairo` is a clean-room, Starknet-native hybrid
-receipt verifier. A policy pins the audience contract, program-measurement
-commitment, computation-policy hash, validity window, TEE authority Stark key,
-and a distinct ZK verifier Stark key. A receipt binds both approvals to the
-chain, verifier, policy, job, expected input commitment, private-evidence
-commitment, result commitment, binary escrow outcome, vendor-attestation
-commitment, ZK-proof commitment, expiry, and scoped nullifier.
+`contracts/src/compute_verifier.cairo` is a clean-room, Starknet-native direct
+Groth16 settlement verifier. A policy pins the audience contract, program
+commitment, computation-policy hash, threshold, validity window, and exact
+verifier contract. The verifier returns eight BN254 public inputs; Cairo checks
+every one against the expected dispute result before consuming a deterministic
+nullifier and returning the buyer/seller outcome.
 
-The browser TypeScript model checks the same public structure and replay rules,
-but treats signatures as opaque. Only the Cairo contract performs Stark-curve
-signature verification. No browser simulation is evidence of a real enclave,
-vendor quote, or ZK proof.
+The browser TypeScript model mirrors the public binding and replay rules. Its
+`proofAccepted` argument represents the onchain verifier response and is not a
+browser cryptographic check. The generated Garaga package supplies the real
+proof verification, including an integration test through this contract.
 
-Before this verifier can drive an escrow outcome, the project must specify:
+An optional `oyster_receipt_commitment` emits a hash-only pointer plus Cairo's
+expected attestation `user_data`. Receipt validation stays independent and
+offchain. The pinned Mac workflow checks Oyster CLI provenance, raw-attestation
+certificate chain, recency, image ID, architecture, and user data. Missing or
+invalid Oyster evidence cannot change a valid ZK settlement.
 
-- the exact TEE platform and accepted vendor root/collateral policy;
-- reproducible enclave image measurement and release process;
-- nonce/freshness binding and attested enclave public-key binding;
-- the exact ZK circuit or Cairo program and canonical public-signal order;
-- how a direct verifier or independently operated verifier authority is
-  governed, rotated, revoked, and monitored; and
-- encrypted evidence ingestion, deletion, availability, and appeal behavior.
+Before release, the project must still specify:
+
+- a production circuit ceremony and independently reviewed verifying key;
+- verifier-contract and compute-policy governance, rotation, and revocation;
+- an immutable Oyster workload image and independently reproduced image ID;
+- a real raw attestation bound to the same synthetic dispute result;
+- encrypted evidence ingestion, deletion, availability, and appeal behavior;
+  and
+- proof calldata and verification-cost limits for the target Starknet release.
 
 ## Sources reviewed
 
 - The STRK20 privacy repository documents the pool, helper/anonymizer model, and a compatibility matrix. Its published privacy-pool and Ekubo/Vesu helper class hashes are references, not Gigstark deployment approvals.
 - The STRK20 Wallet API route keeps viewing keys, note discovery, proof generation, and submission inside the privacy-enabled user wallet. It requires explicit capability detection and uses an open-note-plus-invoke flow for helper interactions.
-- AWS Nitro Enclaves documents that attestation documents are hypervisor-signed,
-  CBOR/COSE objects containing PCR measurements plus optional nonce, public key,
-  and user data. Debug-mode zero PCRs are not acceptable for cryptographic
-  attestation: <https://docs.aws.amazon.com/enclaves/latest/user/verify-root.html>
-  and <https://docs.aws.amazon.com/enclaves/latest/user/set-up-attestation.html>.
+- Oyster documents a native Apple Silicon CLI and independent attestation
+  verification against image ID, AWS Nitro root, recency, and exact user data:
+  <https://docs.marlin.org/oyster/build-cvm/quickstart> and
+  <https://docs.marlin.org/oyster/build-cvm/guides/verify-attestations-oyster-cvm>.
 - Starknet documents both Cairo/STARK provable computation through SHARP and
   SNARK verification in Cairo contracts. These establish feasible proof paths,
   not an audit or approval of Gigstark's future circuit:
@@ -190,7 +192,7 @@ Before this verifier can drive an escrow outcome, the project must specify:
 ## Non-goals
 
 - No autonomous charges or session authority before a separate key-exposure review.
-- No claim that a dual-signed receipt directly verifies vendor hardware or the
-  underlying ZK proof.
+- No claim that an Oyster receipt authorizes settlement or that a browser model
+  verifies either a hardware attestation or Groth16 proof.
 - No TEE custody of STRK20 spending keys, viewing keys, or wallet note state.
 - No public registry modification, contract deployment, funds, tokens, Athera receipt anchor, or claim of cryptographic amount privacy.

@@ -121,11 +121,13 @@ pub trait IGigstarkEscrow<TContractState> {
     ) -> Span<OpenNoteDeposit>;
 
     /// Dispute evidence stays off-chain. The constructor-pinned compute
-    /// verifier must consume a dual-approved result bound to this escrow.
+    /// verifier must accept a direct Groth16 proof bound to this escrow.
+    /// An Oyster receipt commitment is optional and never authorizes settlement.
     fn resolve_dispute(
         ref self: TContractState,
         escrow_id: felt252,
-        receipt: compute_verifier::GigstarkComputeReceipt,
+        result: compute_verifier::GigstarkZkResult,
+        full_proof_with_hints: Span<felt252>,
     );
 }
 
@@ -172,7 +174,7 @@ pub mod GigstarkEscrow {
         ContractAddress, get_block_timestamp, get_caller_address, get_contract_address, get_tx_info,
     };
     use super::compute_verifier::{
-        COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER, GigstarkComputeReceipt,
+        COMPUTE_OUTCOME_BUYER, COMPUTE_OUTCOME_SELLER, GigstarkZkResult,
         IGigstarkComputeVerifierDispatcher, IGigstarkComputeVerifierDispatcherTrait,
     };
     use super::gigstark_passport::PASSPORT_PURPOSE_ESCROW_ROLE;
@@ -400,7 +402,10 @@ pub mod GigstarkEscrow {
         }
 
         fn resolve_dispute(
-            ref self: ContractState, escrow_id: felt252, receipt: GigstarkComputeReceipt,
+            ref self: ContractState,
+            escrow_id: felt252,
+            result: GigstarkZkResult,
+            full_proof_with_hints: Span<felt252>,
         ) {
             let mut escrow = self.escrows.read(escrow_id);
             assert(escrow.status != STATUS_NONE, errors::ESCROW_NOT_FOUND);
@@ -411,7 +416,8 @@ pub mod GigstarkEscrow {
             let verifier = IGigstarkComputeVerifierDispatcher {
                 contract_address: self.compute_verifier.read(),
             };
-            let outcome = verifier.consume_result(escrow_id, input_commitment, receipt);
+            let outcome = verifier
+                .consume_result(escrow_id, input_commitment, result, full_proof_with_hints);
             assert(
                 outcome == COMPUTE_OUTCOME_BUYER || outcome == COMPUTE_OUTCOME_SELLER,
                 errors::INVALID_COMPUTE_OUTCOME,
