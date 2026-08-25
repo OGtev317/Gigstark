@@ -16,13 +16,21 @@ import {
   canonicalPackageGraph,
   type ScarbMetadata,
 } from "../src/lib/cairo-release";
+import {
+  STRK20_MAINNET_EXPECTED_ABI_SHA256,
+  STRK20_MAINNET_EXPECTED_POOL_VERSION,
+  STRK20_MAINNET_POOL,
+  STRK20_MAINNET_V2_CLASS_HASH,
+  STRK20_MAINNET_V2_SOURCE_TAG,
+} from "../src/lib/strk20-mainnet";
 import { STRK20_SEPOLIA_POOL } from "../src/lib/strk20-sepolia";
 
 const SCARB_VERSION = "2.17.0";
 const SNFORGE_VERSION = "0.59.0";
 const EXPECTED_TESTS = 36;
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputPath = join(repositoryRoot, "release", "gigstark-sepolia-review.json");
+const sepoliaOutputPath = join(repositoryRoot, "release", "gigstark-sepolia-review.json");
+const mainnetOutputPath = join(repositoryRoot, "release", "gigstark-mainnet-review.json");
 const releaseInputs = [
   "contracts/.tool-versions",
   "contracts/Scarb.toml",
@@ -207,9 +215,37 @@ async function main() {
       },
     };
 
-    mkdirSync(dirname(outputPath), { recursive: true });
-    writeFileSync(outputPath, `${JSON.stringify(reviewManifest, null, 2)}\n`);
-    console.log(`GIGSTARK_CAIRO_RELEASE_VERIFIED:${outputPath}`);
+    const mainnetReviewManifest = {
+      ...reviewManifest,
+      format: "gigstark-mainnet-review-v1",
+      network: { name: "Starknet Mainnet", chainId: "SN_MAIN" },
+      externalBindings: {
+        privacyPool: {
+          address: STRK20_MAINNET_POOL,
+          classHash: STRK20_MAINNET_V2_CLASS_HASH,
+          sourceTag: STRK20_MAINNET_V2_SOURCE_TAG,
+          abiSha256: STRK20_MAINNET_EXPECTED_ABI_SHA256,
+          poolVersion: STRK20_MAINNET_EXPECTED_POOL_VERSION,
+          sourceProvenance: "source_reproduced_official_v2_lineage",
+          reviewedClassAllowlisted: true,
+        },
+      },
+      releaseGates: {
+        independentCairoReview: "required",
+        privacyPoolSourceReproduction: "passed_for_pinned_mainnet_v2",
+        livePoolHealthAndClassCheck: "required_immediately_before_wallet_preparation_and_submission",
+        constructorArguments: "unset_and_unreviewed",
+        declaration: "not_authorized",
+        deployment: "not_authorized",
+        walletExecution: "blocked_until_prior_gates_pass",
+      },
+    };
+
+    mkdirSync(dirname(sepoliaOutputPath), { recursive: true });
+    writeFileSync(sepoliaOutputPath, `${JSON.stringify(reviewManifest, null, 2)}\n`);
+    writeFileSync(mainnetOutputPath, `${JSON.stringify(mainnetReviewManifest, null, 2)}\n`);
+    console.log(`GIGSTARK_CAIRO_RELEASE_VERIFIED:${sepoliaOutputPath}`);
+    console.log(`GIGSTARK_CAIRO_MAINNET_RELEASE_VERIFIED:${mainnetOutputPath}`);
   } finally {
     rmSync(workDirectory, { recursive: true, force: true });
   }

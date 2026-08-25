@@ -135,8 +135,10 @@ Current progress:
   on an older globally installed compiler.
 - The checksum-pinned release harness archives only committed contract source,
   uses isolated Scarb caches and build output, verifies the unchanged lockfile,
-  runs the Cairo suite, and records package-graph, Sierra, and CASM hashes in a
-  no-broadcast review manifest.
+  runs the Cairo suite, and records package-graph, Sierra, and CASM hashes in
+  separate no-broadcast Sepolia and Mainnet review manifests. The Mainnet
+  manifest pins the source-reproduced V2 pool while leaving governance and
+  constructor inputs unset.
 - Commit a reproducible dependency lock once the real privacy dependency is
   present.
 - Treat the pool's current zero-second upgrade delay as a requirement for fresh

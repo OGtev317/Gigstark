@@ -103,7 +103,11 @@ its pinned SHA-256 digest before execution.
 `npm run verify:cairo-release` independently downloads checksum-pinned Scarb
 2.17.0 and Starknet Foundry 0.59.0 archives, builds only committed contract
 sources in a temporary release workspace, runs the Cairo tests, and writes a
-deployment-disabled review manifest to `release/gigstark-sepolia-review.json`.
+deployment-disabled review manifest for each network lane to
+`release/gigstark-sepolia-review.json` and
+`release/gigstark-mainnet-review.json`. The Mainnet manifest pins the
+source-reproduced V2 pool but deliberately leaves every constructor argument
+unset and unreviewed.
 
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
 Track implementation status and release gates in the dedicated [Gigstark roadmap](ROADMAP.md).

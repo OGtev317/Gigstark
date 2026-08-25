@@ -1,6 +1,6 @@
 # Gigstark internal security review
 
-Last reviewed: 2026-08-24
+Last reviewed: 2026-08-25
 
 This is an app-team review of the local draft, not an independent audit or a
 deployment approval. No contract has been declared or deployed and no wallet
@@ -19,9 +19,11 @@ action or fund movement was performed.
 
 ## Hardening completed
 
-- The wallet runtime now reads `SN_SEPOLIA` and the latest class at the exact
-  pool address from its provider before both preparation and submission. A
-  caller-supplied reviewed hash cannot bypass the live class mismatch.
+- The wallet runtime reads the provider chain and latest class at the exact
+  pool address instead of trusting caller-supplied metadata. Sepolia remains
+  fail-closed on its unreproduced class. Mainnet V2 has a library-only dry-run
+  preparation path, while the existing submission path explicitly rejects
+  Mainnet.
 - Escrow, subscription, and tier consumers enforce separate Passport purposes
   before calling the shared verifier.
 - Receipt signatures bind chain, verifier, audience, policy, purpose,
@@ -55,15 +57,17 @@ action or fund movement was performed.
 - Escrow dispute resolution derives its expected input commitment from the
   chain, escrow contract, escrow fields, and current action nonce, then consumes
   exactly one compute result. No direct binary arbitrator call remains.
-- A Starknet SDK health gate compares two Sepolia providers at exact common
+- A Starknet SDK health gate compares two distinct providers at exact common
   blocks, requires recent accepted and advancing heads, recomputes the live
   Sierra class hash, fingerprints the ABI, and calls pool configuration views.
+  Sepolia and Mainnet use separate exact chain, pool, ABI, version, and class
+  expectations; Mainnet additionally requires the source-reproduced V2 class.
 - The current class declaration and activation blocks and successful receipts
   are checked independently from the source-reproduction decision.
 
 ## Open deployment blockers
 
-1. **Unreproduced STRK20 pool class.** The live class's complete ABI and
+1. **Sepolia provenance remains unresolved.** The live Sepolia class's complete ABI and
    declaration timing match StarkWare commit `5bf8aae`, but the commit's clean
    dev and release artifacts do not reproduce the live Sierra class hash.
    RC.4 and RC.5 of `@starkware-libs/starknet-privacy-sdk` both reproduce the
@@ -71,25 +75,29 @@ action or fund movement was performed.
    was also rebuilt, and the merge result was identical on ARM64 macOS and
    x86_64 Linux. The remaining difference is an unpublished build profile,
    dependency state, or source change; source-level correlation and ABI package
-   identity are not artifact provenance.
+   identity are not artifact provenance. This keeps the Sepolia lane blocked
+   through upstream issue #969; it does not invalidate the separately pinned,
+   source-reproduced Mainnet V2 release lane.
 2. **Attestor trust.** GigstarkPassport verifies a policy-pinned attestation
    receipt. It does not directly verify the underlying ZK proof. Issuance,
    proof-verifier operation, attestor key storage/rotation, and compromise
    response are not implemented.
-3. **Production proving and Oyster evidence remain open.** Direct Groth16
+3. **Production proving remains open; Oyster evidence is optional.** Direct Groth16
    verification works with a real synthetic fixture, but the deterministic
-   test ceremony and placeholder commitments are not production-safe. No paid
-   Oyster job, immutable published workload image, independently reproduced
-   image ID, workload-controlled `user_data` adapter, or raw attestation bound
-   to the fixture exists yet. A generic endpoint that attests caller-supplied
-   user data would not prove execution of the claimed result.
+   test ceremony and placeholder commitments are not production-safe. The
+   dispute path requires an independently reviewed production circuit, proving
+   setup, verification key, and verifier. If the demo includes Oyster, it also
+   requires an immutable published workload image, independently reproduced
+   image ID, workload-controlled `user_data` adapter, and raw attestation bound
+   to the result. Oyster is not required for settlement and cannot choose or
+   alter the outcome.
 4. **Single administrative roles.** Passport and compute policy administration
    are constructor-pinned single addresses in this draft. A reviewed
    multisig/timelock, key rotation, revocation, and emergency policy are
    required before public deployment.
 5. **No independent Cairo audit.** The app-team tests and this review cannot
    replace independent review, property testing, or testnet adversarial drills.
-6. **No live Wallet API E2E.** Ready-wallet proving, rejection, timeout,
+6. **No live Mainnet Wallet API E2E.** Ready-wallet proving, rejection, timeout,
    relayer, RPC disagreement, note maturity, and transaction-resume behavior
    remain untested.
 
@@ -116,15 +124,17 @@ action or fund movement was performed.
 - The pool currently reports a zero-second upgrade delay. A reviewed class can
   therefore change without a timelock window, so the class must be checked
   immediately before both preparation and submission.
-- The release health command compares multiple independent Sepolia providers,
-  but the connected wallet still relies on its selected provider at execution
-  time. Provider disagreement must fail closed.
+- The release health commands compare separately configured providers, but the
+  connected wallet still relies on its selected provider at execution time.
+  Provider disagreement must fail closed.
 
 ## Required next review
 
-Do not declare or deploy until the pool source mapping is published, the Oyster
-image/measurement and attestation-validation path are reproducible, the
-production ZK setup and verification path are fixed, all constructor roles and
-class hashes are reviewed, an independent Cairo review closes critical/high
-findings, and an explicit Sepolia-only transaction review authorizes the
-account, nonce, fees, and constructor calldata.
+Do not declare or deploy on Mainnet until the production ZK setup and
+verification path are fixed, every constructor role and class hash is reviewed,
+a multisig/timelock and emergency policy are selected, an independent Cairo
+review closes critical/high findings, the live Mainnet V2 gate passes again,
+and an explicit Mainnet transaction review authorizes the exact account, chain,
+nonce, fees, class hashes, deployment order, and constructor calldata. If
+Oyster is included in the demo, its separate image and attestation-validation
+requirements must also pass. Sepolia remains blocked on issue #969.
