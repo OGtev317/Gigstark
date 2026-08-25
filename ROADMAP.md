@@ -94,6 +94,11 @@ Current progress:
   ABI fingerprints, and successful pool view calls.
 - The class gate verifies the declaration and activation state changes and
   receipts, then exits nonzero because source reproduction remains incomplete.
+- The live onchain Sierra independently compiles with the exact upstream-pinned
+  universal compiler to the declaration's CASM hash. Both artifact hashes are
+  reproducible, but upstream issue #969 remains open for the missing Cairo
+  source tree and build configuration; the class remains outside the reviewed
+  allowlist.
 - The clean-room `GigstarkPassportVerifier` is connected to buyer/seller action
   authorization and cryptographically verifies action-bound signed receipts.
 - Thirty-six Cairo tests pass across escrow, passport, direct-ZK compute,

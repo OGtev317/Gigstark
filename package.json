@@ -12,6 +12,7 @@
     "proof:verify": "bash compute/zk/scripts/verify-fixture.sh",
     "compute:verify": "bash compute/verify-specimen.sh",
     "verify:starknet-health": "tsx scripts/verify-starknet-health.ts",
+    "verify:strk20-artifacts": "tsx scripts/reproduce-strk20-live-artifacts.ts",
     "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts"
   },
   "dependencies": {

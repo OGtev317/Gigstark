@@ -96,6 +96,14 @@ Scarb binary used by public CI; both produced `0x026155...59b82`. Compiler-host
 architecture therefore does not explain the live class. The public merge CI
 ran tests only and published no contract artifact.
 
+The live onchain Sierra was also compiled independently with the repository-
+pinned `universal-sierra-compiler 2.8.0`. It reproduced compiled class hash
+`0x674605...db75` exactly and produced 42,083 CASM bytecode felts. This proves
+that the declared Sierra/CASM artifact pair is internally reproducible. It does
+not map those artifacts back to Cairo source, so it does not add the live class
+to the reviewed-source allowlist. The upstream provenance request is tracked in
+[`starkware-libs/starknet-privacy#969`](https://github.com/starkware-libs/starknet-privacy/issues/969).
+
 A local clean-room source survey rebuilt every contract-affecting mainline
 commit from the official screening audit base through current `main`, using
 each commit's pinned Scarb generation (`2.17.0` or `2.18.0`). It also checked
@@ -120,6 +128,11 @@ command intentionally exits nonzero while the observed class cannot be
 reproduced. Different endpoints can be supplied through
 `GIGSTARK_SEPOLIA_RPC` and `GIGSTARK_SEPOLIA_RPC_SECONDARY`; no key or account
 is required.
+
+Run `GIGSTARK_USC_BIN=/absolute/path/to/universal-sierra-compiler-2.8.0 npm run
+verify:strk20-artifacts` to re-fetch the live class and reproduce both
+declaration hashes. The command uses a temporary directory, removes the fetched
+artifacts after verification, and never requests a wallet or key.
 
 The zero-second pool upgrade delay means class provenance can change without a
 timelock window. A health result is only a point-in-time observation. Gigstark
