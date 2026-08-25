@@ -92,6 +92,11 @@ available. On Intel or Apple Silicon macOS it otherwise downloads the official
 `universal-sierra-compiler 2.8.0` release into a temporary directory and verifies
 its pinned SHA-256 digest before execution.
 
+`npm run verify:cairo-release` independently downloads checksum-pinned Scarb
+2.17.0 and Starknet Foundry 0.59.0 archives, builds only committed contract
+sources in a temporary release workspace, runs the Cairo tests, and writes a
+deployment-disabled review manifest to `release/gigstark-sepolia-review.json`.
+
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
 Track implementation status and release gates in the dedicated [Gigstark roadmap](ROADMAP.md).
 Review the [compute specimen](compute/README.md) and its explicit hardware and

@@ -121,6 +121,10 @@ Current progress:
   `privacy_invoke` action shape from primary sources.
 - Run the project with the pinned Scarb and Cairo toolchain rather than relying
   on an older globally installed compiler.
+- The checksum-pinned release harness archives only committed contract source,
+  uses isolated Scarb caches and build output, verifies the unchanged lockfile,
+  runs the Cairo suite, and records package-graph, Sierra, and CASM hashes in a
+  no-broadcast review manifest.
 - Commit a reproducible dependency lock once the real privacy dependency is
   present.
 - Treat the pool's current zero-second upgrade delay as a requirement for fresh

@@ -49,15 +49,15 @@ already paid creator claims. There is no autonomous charging.
 Run:
 
 ```zsh
-cd contracts
-scarb --version # must report 2.17.0
-snforge --version # must report 0.59.0
-scarb build
-snforge test
+cd ..
+npm run verify:cairo-release
 ```
 
-The dependency lock must remain checked in. Thirty-six contract tests pass
-locally with the pinned toolchain, but this is not a deployment approval.
+This checksum-pins official Scarb 2.17.0 and Starknet Foundry 0.59.0 archives,
+uses an isolated clean source archive and package cache, builds the release
+profile, and runs the tests without changing global tools. The dependency lock
+must remain checked in. Thirty-six contract tests pass locally with the pinned
+toolchain, but this is not a deployment approval.
 
 The exact upstream release, live pool mismatch, and deployment gate are in
 `STRK20_SEPOLIA_PIN.md`.
