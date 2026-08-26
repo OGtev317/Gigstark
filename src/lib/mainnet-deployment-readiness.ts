@@ -47,7 +47,7 @@ export type MainnetDeploymentInputs = {
   deployer: {
     accountAddress: string | null;
     accountClassHash: string | null;
-    maximumTotalFeeWei: string | null;
+    maximumTotalFeeFri: string | null;
   };
 };
 
@@ -186,8 +186,8 @@ export function reviewMainnetDeploymentInputs(
 
   if (!isAddress(input.deployer.accountAddress)) blockers.push("DEPLOYER_ACCOUNT_UNSET");
   if (!isFelt(input.deployer.accountClassHash)) blockers.push("DEPLOYER_CLASS_UNSET");
-  if (!isPositiveIntegerString(input.deployer.maximumTotalFeeWei)) {
-    blockers.push("MAXIMUM_TOTAL_FEE_UNSET");
+  if (!isPositiveIntegerString(input.deployer.maximumTotalFeeFri)) {
+    blockers.push("MAXIMUM_TOTAL_FEE_FRI_UNSET");
   }
 
   return [...new Set(blockers)];

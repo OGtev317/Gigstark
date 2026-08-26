@@ -33,3 +33,5 @@ fields. It exits nonzero while any independent-review, governance, production
 proof, attestor, deployer, or fee input is unresolved. Even a passing result is
 explicitly no-broadcast and still requires review of the current nonce, fees,
 deployment order, constructor calldata, and every wallet signature request.
+`maximumTotalFeeFri` is the total deployment budget ceiling in fri
+(`1 STRK = 10^18 fri`); it is not an ETH-denominated wei value.

@@ -75,7 +75,7 @@ const completeInput = (): MainnetDeploymentInputs => ({
   deployer: {
     accountAddress: "0x666",
     accountClassHash: "0x777",
-    maximumTotalFeeWei: "1000000000000000000",
+    maximumTotalFeeFri: "1000000000000000000",
   },
 });
 

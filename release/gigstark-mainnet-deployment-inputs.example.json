@@ -39,6 +39,6 @@
   "deployer": {
     "accountAddress": null,
     "accountClassHash": null,
-    "maximumTotalFeeWei": null
+    "maximumTotalFeeFri": null
   }
 }
