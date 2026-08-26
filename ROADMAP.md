@@ -24,21 +24,38 @@ cannot submit.
 
 ## Must-ship demo
 
-The hackathon demo is complete only when all of these flows work through the
-reviewed Cairo contract and a privacy-enabled user wallet:
+The hackathon demo is complete only when these connected creator-economy flows
+work through reviewed Cairo contracts, a reviewed encrypted-message transport,
+and a privacy-enabled user wallet:
 
-1. A buyer privately deposits into a milestone escrow.
-2. The seller submits a delivery commitment.
-3. The buyer confirms delivery and the seller receives exactly one private
-   note.
-4. A dispute variant produces a ZK proof over the committed private evidence.
-5. Cairo directly verifies the proof and binds its eight public signals to the
-   exact job, input, policy, result, outcome, and expiry.
-6. An independently verifiable Oyster receipt may attest to the same program and
-   result, but is not required for Cairo to resolve the seller or buyer.
-7. Replayed compute receipts, actions, and double claims fail.
-8. A one-period subscription and audience-bound tier proof work as the second
-   demo.
+1. A creator publishes a paid offering, a bounded subscription tier, and an
+   encrypted member inbox.
+2. A member connects a privacy-enabled wallet; Gigstark verifies the advertised
+   Wallet API version and exact Starknet network without reading private
+   balances or note state.
+3. The member explicitly pays for one subscription period through STRK20. No
+   autonomous recurring authority is created.
+4. A current audience-bound tier proof unlocks creator access without exposing
+   wallet history or acting as a payment receipt.
+5. The member encrypts a message locally. The reviewed transport receives only
+   ciphertext, a scoped routing tag, replay nullifier, and integrity digest;
+   plaintext and private encryption keys never enter calldata, events, logs, or
+   shared storage.
+6. The intended creator discovers the encrypted envelope and decrypts it
+   locally; a wrong recipient and a tampered envelope fail.
+7. For milestone work, the member privately deposits into escrow, the creator
+   submits a delivery commitment, and member confirmation releases exactly one
+   private note to the creator.
+8. A dispute variant produces a ZK proof over committed private evidence. Cairo
+   binds all eight public signals to the exact job, input, policy, result,
+   outcome, and expiry before selecting the member or creator.
+9. An independently verifiable Oyster receipt may attest to the same program
+   and result, but cannot authorize, block, or change Cairo settlement.
+10. Replayed messages, tier proofs, compute receipts, settlement actions, and
+    double claims fail; cancellation and timeout refund paths remain bounded.
+11. The final demo shows verified explorer links for every live action while
+    distinguishing public helper amounts/timing from hidden identities,
+    plaintext, wallet note state, and proof witnesses.
 
 The browser simulations demonstrate sequencing, but they do not satisfy this
 definition of done by themselves.
@@ -342,6 +359,15 @@ revocation, and replay must fail. Oyster failure must not change ZK settlement.
 ## Milestone 7 — Mainnet release candidate
 
 **Status: In progress; no deployment authorized**
+
+- Fresh verification on 2026-08-26 showed two independent `SN_MAIN` providers
+  agreeing on an advancing accepted head and the source-reproduced STRK20 V2
+  pool class, ABI fingerprint, and version `2.0`.
+- The immediately following deployment review returned
+  `BLOCKED_NO_BROADCAST`. Independent review, production verifier/circuit/VK
+  and ceremony lineage, attestor key/policies, and the maximum total fee ceiling
+  remain unset or unreviewed. No declaration, deployment, signature request, or
+  transaction was produced.
 
 - Complete independent contract, wallet, and privacy reviews.
 - Verify current Mainnet chain identity, pool deployment, ABI, class hash, and
