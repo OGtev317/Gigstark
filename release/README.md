@@ -1,5 +1,8 @@
 # Gigstark release review package
 
+Start an independent Mainnet review with
+[`MAINNET_INDEPENDENT_REVIEW_CHECKLIST.md`](MAINNET_INDEPENDENT_REVIEW_CHECKLIST.md).
+
 `gigstark-sepolia-review.json` and `gigstark-mainnet-review.json` are generated
 by:
 
@@ -11,7 +14,7 @@ The command refuses uncommitted compiler inputs under `contracts/`, archives
 the last commit that changed those inputs, downloads the official Scarb 2.17.0
 and Starknet Foundry 0.59.0 release archives for the current macOS or Linux
 architecture, checks their pinned SHA-256 digests, and uses an isolated cache
-and target directory. It performs a release-profile build, runs all 36 Cairo
+and target directory. It performs a release-profile build, runs all 37 Cairo
 tests, checks that `Scarb.lock` did not change, fingerprints the normalized
 package graph, and computes each Sierra and compiled-class hash.
 
