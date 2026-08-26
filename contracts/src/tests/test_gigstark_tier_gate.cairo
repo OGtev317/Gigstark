@@ -96,6 +96,11 @@ fn setup() -> TierContext {
             POLICY_END,
             attestor.public_key,
         );
+    cheat_caller_address_once(
+        contract_address: verifier_address, caller_address: ADMIN.try_into().unwrap(),
+    );
+    IGigstarkPassportVerifierDispatcher { contract_address: verifier_address }
+        .set_policy_active(POLICY_ID, true);
     start_cheat_block_timestamp(verifier_address, NOW);
     start_cheat_block_timestamp(gate_address, NOW);
     TierContext { gate_address, verifier_address, attestor }

@@ -60,6 +60,7 @@ pub mod errors {
     pub const ZERO_ADMIN: felt252 = 'PASSPORT_ZERO_ADMIN';
     pub const ONLY_ADMIN: felt252 = 'PASSPORT_ONLY_ADMIN';
     pub const INVALID_POLICY: felt252 = 'PASSPORT_BAD_POLICY';
+    pub const POLICY_EXISTS: felt252 = 'PASSPORT_POLICY_EXISTS';
     pub const POLICY_INACTIVE: felt252 = 'PASSPORT_INACTIVE';
     pub const POLICY_EXPIRED: felt252 = 'PASSPORT_POLICY_TIME';
     pub const AUDIENCE_MISMATCH: felt252 = 'PASSPORT_AUDIENCE';
@@ -180,6 +181,10 @@ pub mod GigstarkPassportVerifier {
         ) {
             self.assert_admin();
             assert(
+                self.policies.read(policy_id).attestor_public_key == 0,
+                errors::POLICY_EXISTS,
+            );
+            assert(
                 policy_id != 0
                     && audience.is_non_zero()
                     && purpose != 0
@@ -199,7 +204,7 @@ pub mod GigstarkPassportVerifier {
                         valid_from,
                         valid_until,
                         attestor_public_key,
-                        active: true,
+                        active: false,
                     },
                 );
             self.emit(PolicyConfigured { policy_id, audience });

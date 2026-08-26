@@ -28,7 +28,10 @@ receipts under an audience-specific policy. It rejects wrong audiences, roles,
 expiry, revoked policies, and scoped nullifier replay. It is clean-room
 Gigstark code and imports no Athera contract, root, trust, or network state. It
 is a signed receipt verifier for an opaque proof accepted off-chain, not a
-direct ZK circuit verifier.
+direct ZK circuit verifier. New policies are staged inactive, policy IDs are
+immutable after configuration, and activation/deactivation is an explicit
+admin action. Attestor rotation therefore uses a new reviewed policy ID rather
+than overwriting an active key in place.
 
 `GigstarkComputeVerifier` calls the Groth16 verifier address pinned by the
 active policy. It requires exactly eight returned public inputs to match the

@@ -27,7 +27,7 @@ import { STRK20_SEPOLIA_POOL } from "../src/lib/strk20-sepolia";
 
 const SCARB_VERSION = "2.17.0";
 const SNFORGE_VERSION = "0.59.0";
-const EXPECTED_TESTS = 36;
+const EXPECTED_TESTS = 37;
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const sepoliaOutputPath = join(repositoryRoot, "release", "gigstark-sepolia-review.json");
 const mainnetOutputPath = join(repositoryRoot, "release", "gigstark-mainnet-review.json");

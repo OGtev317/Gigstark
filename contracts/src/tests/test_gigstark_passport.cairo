@@ -14,6 +14,7 @@ use starkware_utils_testing::test_utils::{
 };
 use super::super::gigstark_passport::{
     IGigstarkPassportVerifierDispatcher, IGigstarkPassportVerifierDispatcherTrait,
+    IGigstarkPassportVerifierSafeDispatcher, IGigstarkPassportVerifierSafeDispatcherTrait,
     PASSPORT_PURPOSE_ESCROW_ROLE, errors as passport_errors,
 };
 use super::super::{
@@ -63,6 +64,11 @@ impl PassportContextImpl of PassportContextTrait {
 
     fn passport(self: @PassportContext) -> IGigstarkPassportVerifierDispatcher {
         IGigstarkPassportVerifierDispatcher { contract_address: *self.verifier_address }
+    }
+
+    #[feature("safe_dispatcher")]
+    fn safe_passport(self: @PassportContext) -> IGigstarkPassportVerifierSafeDispatcher {
+        IGigstarkPassportVerifierSafeDispatcher { contract_address: *self.verifier_address }
     }
 
     fn deposit(self: @PassportContext) {
@@ -166,6 +172,16 @@ fn setup() -> PassportContext {
             POLICY_END,
             attestor.public_key,
         );
+    let configured_policy = IGigstarkPassportVerifierDispatcher {
+        contract_address: verifier_address,
+    }
+        .get_policy(POLICY_ID);
+    assert(!configured_policy.active, 'POLICY_NOT_STAGED');
+    cheat_caller_address_once(
+        contract_address: verifier_address, caller_address: ADMIN.try_into().unwrap(),
+    );
+    IGigstarkPassportVerifierDispatcher { contract_address: verifier_address }
+        .set_policy_active(POLICY_ID, true);
 
     start_cheat_block_timestamp(escrow_address, NOW);
     start_cheat_block_timestamp(verifier_address, NOW);
@@ -385,6 +401,27 @@ fn test_revoked_policy_fails() {
             proof,
         );
     assert_panic_with_felt_error(result, passport_errors::POLICY_INACTIVE);
+}
+
+#[test]
+#[feature("safe_dispatcher")]
+fn test_policy_id_is_immutable_after_configuration() {
+    let context = setup();
+    cheat_caller_address_once(
+        contract_address: context.verifier_address, caller_address: ADMIN.try_into().unwrap(),
+    );
+    let result = context
+        .safe_passport()
+        .set_policy(
+            POLICY_ID,
+            context.escrow_address,
+            PASSPORT_PURPOSE_ESCROW_ROLE,
+            CREDENTIAL_CLASS,
+            POLICY_START,
+            POLICY_END,
+            context.attestor.public_key,
+        );
+    assert_panic_with_felt_error(result, passport_errors::POLICY_EXISTS);
 }
 
 #[test]
