@@ -257,7 +257,7 @@ export function WalletCapability() {
   const connectedAddress = account?.address;
 
   return (
-    <section className="wallet-check" aria-labelledby="wallet-check-title">
+    <section id="wallet-check" className="wallet-check" aria-labelledby="wallet-check-title">
       <div>
         <p className="eyebrow">Wallet API readiness</p>
         <h2 id="wallet-check-title">Review first. Ask the wallet second.</h2>

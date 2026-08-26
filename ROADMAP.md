@@ -1,9 +1,11 @@
 # Gigstark roadmap
 
-Last reviewed: 2026-08-25
+Last reviewed: 2026-08-26
 
-Gigstark is a standalone Starknet and STRK20 project for private freelance
-milestones, creator subscriptions, and proof-gated access. Its strategic center
+Gigstark is a standalone Starknet and STRK20 project centered on encrypted
+creator-member messaging plus private subscriptions and creator monetization.
+Private freelance milestones and proof-gated access support those two product
+pillars. Its strategic center
 is now direct ZK settlement with an optional, independently verifiable Oyster
 TEE receipt for confidential execution evidence. Oyster never becomes a second
 settlement authority. It does not use Athera L1 or L3 contracts. Development
@@ -237,7 +239,7 @@ moving production funds.
 
 ## Milestone 4 — subscriptions and tier access
 
-**Status: Contract and tier-gate drafts complete locally; wallet execution planned**
+**Status: Contract/tier drafts and local product surface complete; wallet execution planned**
 
 - Start with one explicitly authorized paid period.
 - Support at most three prepaid periods, cancellation, expiry, and one private
@@ -251,6 +253,30 @@ moving production funds.
   without wallet scanning.
 - Add Wallet API preparation and UI review for period payment and creator
   claims after the escrow end-to-end flow is cleared.
+- The static hackathon app now includes browser-local creator/member profiles,
+  listings, proposals, order lifecycle, bounded subscription plans, local
+  receipt labels, reputation, and tier-feed records. These records are local
+  product simulations, not shared data, payment evidence, or access authority.
+- A versioned JSON export/import format provides portability for demo records.
+  It must never contain wallet keys, viewing keys, proofs, private witnesses,
+  identity documents, or delivery evidence.
+
+## Milestone 4.5 — encrypted creator-member messaging
+
+**Status: Local encrypted-envelope prototype; chain transport gated**
+
+- The browser prototype uses an ephemeral ECDH/AES-GCM envelope: plaintext and
+  private encryption keys remain in the browser session, while only ciphertext,
+  public routing metadata, and an integrity digest are representable outside it.
+- A future Starknet transport may accept encrypted envelopes plus a scoped
+  routing tag and replay nullifier. It must reject plaintext, private keys,
+  viewing keys, proofs, and delivery evidence; it also needs anti-spam,
+  retention, moderation, indexing, and independent security review.
+- Messaging is a creator monetization primitive: subscription/tier access can
+  gate inbox eligibility, but no browser-side receipt or profile is an access
+  authority.
+- No messaging helper, relay, indexer, contract deployment, or live chain
+  submission is authorized at this stage.
 
 ## Milestone 5 — ZK settlement plus Oyster receipt
 

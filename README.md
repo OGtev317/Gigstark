@@ -1,7 +1,9 @@
 # Gigstark
 
-Gigstark is a non-custodial STRK20 prototype for private freelance milestones
-and creator subscriptions on Starknet. Its settlement center is a
+Gigstark is a non-custodial STRK20 prototype centered on encrypted
+creator-member messaging and private subscriptions/creator monetization on
+Starknet. Private freelance milestones and proof-gated access support those
+two hackathon pillars. Its settlement center is a
 directly verified ZK proof. Marlin Oyster can add a separately verifiable TEE
 receipt for confidential execution, but that optional receipt cannot authorize,
 block, or override settlement. It is a standalone project and does not use
@@ -11,6 +13,12 @@ Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 
 ## What runs now
 
+- A session-only ECDH/AES-GCM creator-member messaging demo that excludes
+  plaintext and private encryption keys from its portable ciphertext envelope,
+  detects tampering, and permits only the intended recipient to decrypt.
+- Browser-local creator/member profiles, listings, proposals, orders,
+  reputation, tier-feed entries, bounded subscription plans, and explicitly
+  non-authoritative receipt labels, with versioned local JSON export/import.
 - A browser-only escrow state-machine demo: deposit → delivery commitment → buyer confirmation or dispute outcome → one private-note claim.
 - Tests for ordering, replay protection, double-claim rejection, seller settlement, and buyer dispute outcomes.
 - A bounded subscription state machine: one paid period, maximum three prepaid periods, cancellation, expiry, and one creator claim per period.
@@ -43,6 +51,11 @@ Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 - A root `strk20.json` submission manifest and static Cloudflare Pages export.
 
 ## What is intentionally not live
+
+No messaging contract, relay, indexer, or chain publication path is wired.
+The encrypted-message demo uses session-only browser keys and makes no claim
+that messaging is live onchain. Local marketplace and subscription records are
+not shared data, payment evidence, or access authority.
 
 The UI contains an explicit prepare-then-sign transaction flow, but the current
 live Sepolia pool class is intentionally rejected before wallet preparation or
