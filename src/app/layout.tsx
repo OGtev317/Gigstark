@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./starknet-theme.css";
 
 export const metadata: Metadata = {
   title: "Gigstark — private verifiable settlement",

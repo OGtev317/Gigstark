@@ -145,7 +145,11 @@ export async function verifyReviewedPoolTarget(
   target: ReviewedPoolTarget,
 ): Promise<ReviewedPool> {
   const chainId = await provider.getChainId();
-  if (!isTargetChainId(chainId, target)) throw new Error("STRK20_WRONG_CHAIN");
+  if (!isTargetChainId(chainId, target)) {
+    throw new Error(
+      target.network === "SN_MAIN" ? "STRK20_WRONG_MAINNET_CHAIN" : "STRK20_WRONG_CHAIN",
+    );
+  }
   const pool = {
     address: target.address,
     classHash: await provider.getClassHashAt(target.address, "latest"),

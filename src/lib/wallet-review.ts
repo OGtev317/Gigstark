@@ -69,11 +69,14 @@ export function walletFlowErrorMessage(error: unknown): string {
   if (message.includes("STRK20_WRONG_CHAIN")) {
     return "The configured RPC is not Starknet Sepolia. Preparation stopped before the wallet request.";
   }
+  if (message.includes("STRK20_WRONG_MAINNET_CHAIN")) {
+    return "The configured RPC is not Starknet Mainnet. Preparation stopped before the wallet request.";
+  }
   if (message.includes("STRK20_POOL_CLASS_UNREVIEWED")) {
-    return "The live Sepolia STRK20 pool class is not reproduced from reviewed source. Preparation remains blocked.";
+    return "The live STRK20 pool class does not match the reviewed target. Preparation remains blocked.";
   }
   if (message.includes("STRK20_POOL_ADDRESS_MISMATCH")) {
-    return "The STRK20 pool address does not match the reviewed Sepolia configuration.";
+    return "The STRK20 pool address does not match the reviewed network configuration.";
   }
   if (message.includes("ESCROW_")) {
     return "The onchain escrow token, winner, amount, or claim state does not match this review. Nothing was submitted.";

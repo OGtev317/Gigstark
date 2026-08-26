@@ -62,6 +62,10 @@ test("wrong-chain UI message is specific and confirms preparation stopped", () =
     walletFlowErrorMessage(new Error("STRK20_WRONG_CHAIN")),
     "The configured RPC is not Starknet Sepolia. Preparation stopped before the wallet request.",
   );
+  assert.equal(
+    walletFlowErrorMessage(new Error("STRK20_WRONG_MAINNET_CHAIN")),
+    "The configured RPC is not Starknet Mainnet. Preparation stopped before the wallet request.",
+  );
 });
 
 test("wallet rejection UI does not imply that a transaction was submitted", () => {

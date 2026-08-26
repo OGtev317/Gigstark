@@ -7,6 +7,8 @@ receipt for confidential execution, but that optional receipt cannot authorize,
 block, or override settlement. It is a standalone project and does not use
 Athera L1 or L3.
 
+Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
+
 ## What runs now
 
 - A browser-only escrow state-machine demo: deposit → delivery commitment → buyer confirmation or dispute outcome → one private-note claim.
@@ -38,6 +40,7 @@ Athera L1 or L3.
   acknowledgement.
 - A safe product boundary: Gigstark never requests or stores a private key,
   viewing key, private note, or private witness.
+- A root `strk20.json` submission manifest and static Cloudflare Pages export.
 
 ## What is intentionally not live
 
@@ -73,6 +76,10 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+`npm run build` also writes the deployable static site to `out/`. The public
+deployment includes `/strk20.json`; its empty transaction, contract, and video
+fields are deliberate until verified Mainnet evidence exists.
 
 ## Contract direction
 

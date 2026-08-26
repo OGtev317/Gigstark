@@ -290,6 +290,26 @@ test("Mainnet preparation fails before the wallet when the live class changes", 
   assert.equal(prepared, false);
 });
 
+test("Mainnet preparation reports a Mainnet-specific wrong-chain gate", async () => {
+  const account: Strk20WalletAccount = {
+    async strk20PrepareInvoke() {
+      throw new Error("NOT_EXPECTED");
+    },
+    async strk20InvokeTransaction() {
+      throw new Error("NOT_EXPECTED");
+    },
+  };
+  const { pool: _pool, ...depositInput } = deposit();
+  await assert.rejects(
+    prepareMainnetPrivateDepositForReview(
+      account,
+      { ...mainnetProvider(), async getChainId() { return "SN_SEPOLIA"; } },
+      depositInput,
+    ),
+    /STRK20_WRONG_MAINNET_CHAIN/,
+  );
+});
+
 test("winner-note review rejects mismatched or consumed escrow state before the wallet", async () => {
   let prepared = false;
   const account: Strk20WalletAccount = {
