@@ -7,9 +7,9 @@
   },
   "source": {
     "repository": "https://github.com/OGtev317/Gigstark",
-    "commit": "987bdd1460682f7773329f93edc7e36bceec60bc",
-    "contractsTree": "a175446b5980154b49cdf187f5b4d9c0eb8b69eb",
-    "archiveSha256": "794b5c97c6c76a161a35ecd4e0026f97fefa69e6a8a50abf12b70243d0390431",
+    "commit": "36dca38d94a2cf6e287646804af8ed73000b1b99",
+    "contractsTree": "79c49d1ded6f60cec272f5ee541ece3500409d27",
+    "archiveSha256": "7863751d62b9af6e1b37afc6bd0660307916c8fa21cc1e4c5bdc20c59274f144",
     "scarbManifestSha256": "3d76071156b2c5cd7dc619ff8ad357b5dba94224f6db72aef0087d4c9dbd85f1",
     "scarbLockSha256": "a746990d6a594b2654cf41e54d01b066845483e336cea76195aad45e8cee8874",
     "lockUnchangedAfterBuild": true
@@ -296,7 +296,7 @@
     "cleanCommittedContractArchive": true,
     "releaseBuild": "passed",
     "cairoTests": {
-      "passed": 36,
+      "passed": 37,
       "failed": 0
     },
     "rpcRequests": false,
@@ -357,12 +357,12 @@
     {
       "name": "GigstarkPassportVerifier",
       "modulePath": "gigstark_escrow::gigstark_passport::GigstarkPassportVerifier",
-      "sierraClassHash": "0x667b990751859b61c8e762141e17e5c0987f7c01f635cf89ee64204b4c4301",
-      "compiledClassHash": "0x620112e1110c41bee7e35834480be79d8f822184bf465645e73d80e8f09ca08",
-      "sierraArtifactSha256": "593a0b380d9e65f83b4ce489cb0a7a722356e7df0986674b8bd2d3e823845b8e",
-      "casmArtifactSha256": "2990f544889b0784504d72245c68fcb0ade18dcbe26fca64471bedf077666c5c",
-      "sierraProgramLength": 2906,
-      "casmBytecodeLength": 5594,
+      "sierraClassHash": "0x1100e7cd1d025630f7452935f6dd6846ae49728497f4c517c30ee9d8f1ecbd2",
+      "compiledClassHash": "0x7efe597fa0a36edcd666e3b533e64aecd2d2e01644a5c70f1d1b412ac487a92",
+      "sierraArtifactSha256": "1c6dae151ba2feead5b4aba840714e817df1a4dbda318ddb82adfc29b2d8f799",
+      "casmArtifactSha256": "8d49aa2992f198c4fc5343147ce16f41bb86593471d5b4b599455d2d19d9fe6a",
+      "sierraProgramLength": 2947,
+      "casmBytecodeLength": 5684,
       "constructor": {
         "arguments": [
           {
