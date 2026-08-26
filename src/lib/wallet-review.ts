@@ -1,5 +1,6 @@
 export const STARKNET_SEPOLIA_WALLET_CHAIN =
   "starknet:0x534e5f5345504f4c4941";
+export const STARKNET_MAINNET_WALLET_CHAIN = "starknet:0x534e5f4d41494e";
 
 export type WalletAccountDescriptor = {
   address: string;
@@ -31,6 +32,17 @@ export function requireSepoliaWalletAccount(
   return account;
 }
 
+export function requireMainnetWalletAccount(
+  accounts: readonly WalletAccountDescriptor[],
+): WalletAccountDescriptor {
+  const account = accounts[0];
+  if (!account) throw new Error("WALLET_CONNECTION_REJECTED");
+  if (!account.chains.some(isMainnetWalletChain)) {
+    throw new Error("WALLET_WRONG_MAINNET_CHAIN");
+  }
+  return account;
+}
+
 export function walletReviewControls(
   phase: WalletReviewPhase,
   acknowledged: boolean,
@@ -50,6 +62,9 @@ export function walletFlowErrorMessage(error: unknown): string {
   }
   if (message.includes("WALLET_WRONG_CHAIN")) {
     return "The connected wallet account is not on Starknet Sepolia. Switch networks and reconnect.";
+  }
+  if (message.includes("WALLET_WRONG_MAINNET_CHAIN")) {
+    return "The connected wallet account is not on Starknet Mainnet. Switch networks and reconnect.";
   }
   if (message.includes("STRK20_WRONG_CHAIN")) {
     return "The configured RPC is not Starknet Sepolia. Preparation stopped before the wallet request.";
@@ -77,6 +92,14 @@ function isSepoliaWalletChain(chain: string): boolean {
   return (
     normalized === STARKNET_SEPOLIA_WALLET_CHAIN.toLowerCase() ||
     normalized === "starknet:sn_sepolia"
+  );
+}
+
+function isMainnetWalletChain(chain: string): boolean {
+  const normalized = chain.toLowerCase();
+  return (
+    normalized === STARKNET_MAINNET_WALLET_CHAIN.toLowerCase() ||
+    normalized === "starknet:sn_main"
   );
 }
 

@@ -1,11 +1,36 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  STARKNET_MAINNET_WALLET_CHAIN,
   STARKNET_SEPOLIA_WALLET_CHAIN,
+  requireMainnetWalletAccount,
   requireSepoliaWalletAccount,
   walletFlowErrorMessage,
   walletReviewControls,
 } from "../src/lib/wallet-review";
+
+test("wallet readiness accepts only a connected Starknet Mainnet account", () => {
+  assert.equal(
+    requireMainnetWalletAccount([
+      { address: "0x456", chains: [STARKNET_MAINNET_WALLET_CHAIN] },
+    ]).address,
+    "0x456",
+  );
+  assert.equal(
+    requireMainnetWalletAccount([
+      { address: "0x456", chains: ["starknet:SN_MAIN"] },
+    ]).address,
+    "0x456",
+  );
+  assert.throws(
+    () =>
+      requireMainnetWalletAccount([
+        { address: "0x456", chains: [STARKNET_SEPOLIA_WALLET_CHAIN] },
+      ]),
+    /WALLET_WRONG_MAINNET_CHAIN/,
+  );
+  assert.throws(() => requireMainnetWalletAccount([]), /WALLET_CONNECTION_REJECTED/);
+});
 
 test("wallet review accepts only a connected Starknet Sepolia account", () => {
   assert.equal(
@@ -25,6 +50,10 @@ test("wallet review accepts only a connected Starknet Sepolia account", () => {
 });
 
 test("wrong-chain UI message is specific and confirms preparation stopped", () => {
+  assert.equal(
+    walletFlowErrorMessage(new Error("WALLET_WRONG_MAINNET_CHAIN")),
+    "The connected wallet account is not on Starknet Mainnet. Switch networks and reconnect.",
+  );
   assert.equal(
     walletFlowErrorMessage(new Error("WALLET_WRONG_CHAIN")),
     "The connected wallet account is not on Starknet Sepolia. Switch networks and reconnect.",

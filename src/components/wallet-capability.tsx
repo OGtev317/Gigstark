@@ -14,6 +14,7 @@ import {
   type GigstarkPassportProofCalldata,
 } from "../lib/strk20-wallet";
 import {
+  requireMainnetWalletAccount,
   requireSepoliaWalletAccount,
   walletFlowErrorMessage,
   walletReviewControls,
@@ -23,6 +24,9 @@ import {
 const SEPOLIA_RPC =
   process.env.NEXT_PUBLIC_GIGSTARK_SEPOLIA_RPC ??
   "https://api.cartridge.gg/x/starknet/sepolia";
+const MAINNET_RPC =
+  process.env.NEXT_PUBLIC_GIGSTARK_MAINNET_RPC ??
+  "https://starknet-rpc.publicnode.com";
 
 type CapabilityResult = {
   name: string;
@@ -57,6 +61,10 @@ export function WalletCapability() {
   const [results, setResults] = useState<CapabilityResult[]>([]);
   const [checking, setChecking] = useState(false);
   const [selectedWalletName, setSelectedWalletName] = useState("");
+  const [mainnetAccount, setMainnetAccount] = useState<WalletAccountV6 | null>(null);
+  const [mainnetMessage, setMainnetMessage] = useState(
+    "Connect only to confirm the selected public Mainnet account. No transaction will be prepared.",
+  );
   const [account, setAccount] = useState<WalletAccountV6 | null>(null);
   const [phase, setPhase] = useState<WalletReviewPhase>("disconnected");
   const [fields, setFields] = useState<DepositFields>(EMPTY_DEPOSIT);
@@ -81,6 +89,15 @@ export function WalletCapability() {
   }, []);
 
   useEffect(() => {
+    if (!mainnetAccount) return;
+    const unsubscribe = mainnetAccount.onChange(() => {
+      setMainnetAccount(null);
+      setMainnetMessage("The wallet account or network changed. Review and reconnect.");
+    });
+    return () => unsubscribe();
+  }, [mainnetAccount]);
+
+  useEffect(() => {
     if (!account) return;
     const unsubscribe = account.onChange(() => {
       setAccount(null);
@@ -91,6 +108,36 @@ export function WalletCapability() {
     });
     return () => unsubscribe();
   }, [account]);
+
+  async function connectMainnetWallet() {
+    const wallet = wallets.find((candidate) => candidate.name === selectedWalletName);
+    if (!wallet) {
+      setMainnetMessage("Select a compatible wallet first.");
+      return;
+    }
+
+    setMainnetMessage("Waiting for Mainnet wallet connection approval…");
+    try {
+      const capability = await detectStrk20WalletApi(wallet);
+      if (!capability.supported) throw new Error("WALLET_API_UNSUPPORTED");
+      const connection = await wallet.features["standard:connect"].connect();
+      const connected = requireMainnetWalletAccount(connection.accounts);
+      const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
+      setMainnetAccount(
+        new WalletAccountV6({
+          provider,
+          walletProvider: wallet,
+          address: connected.address,
+        }),
+      );
+      setMainnetMessage(
+        "Mainnet account connected for readiness review. No balance, note, proof, or transaction request was made.",
+      );
+    } catch (error) {
+      setMainnetAccount(null);
+      setMainnetMessage(walletFlowErrorMessage(error));
+    }
+  }
 
   async function checkCapabilities() {
     const discovered = storeRef.current?.getWallets() ?? wallets;
@@ -247,6 +294,24 @@ export function WalletCapability() {
             ))}
           </select>
         </label>
+        <p className="eyebrow">Mainnet release connection</p>
+        <button
+          type="button"
+          className="secondary"
+          onClick={connectMainnetWallet}
+          disabled={!selectedWalletName || Boolean(mainnetAccount)}
+        >
+          {mainnetAccount ? "Connected on Mainnet" : "Connect selected wallet on Mainnet"}
+        </button>
+        {mainnetAccount ? (
+          <p className="mono">Mainnet account: {mainnetAccount.address}</p>
+        ) : null}
+        <p className="wallet-flow-status" role="status">{mainnetMessage}</p>
+        <p className="wallet-blocked">
+          Connection-only gate: this control cannot read balances, prepare STRK20 actions, request
+          signatures, or submit transactions.
+        </p>
+        <p className="eyebrow">Legacy Sepolia contract review</p>
         <button
           type="button"
           className="secondary"
