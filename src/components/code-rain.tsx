@@ -45,7 +45,7 @@ export function CodeRain() {
     }
     function draw() {
       const { innerWidth: width, innerHeight: height } = window;
-      drawingContext.fillStyle = "rgba(0, 0, 0, 0.12)";
+      drawingContext.fillStyle = "rgba(0, 0, 0, 0.09)";
       drawingContext.fillRect(0, 0, width, height);
       drawingContext.font = "15px 'Courier New', monospace";
       streams.forEach((stream) => {
@@ -55,10 +55,10 @@ export function CodeRain() {
           const alpha = 1 - index / stream.length;
           const head = index === 0;
           drawingContext.fillStyle = head
-            ? "rgba(247, 245, 255, 0.94)"
+            ? "rgba(247, 245, 255, 1)"
             : stream.hue === "purple"
-              ? `rgba(168, 85, 247, ${alpha * 0.52})`
-              : `rgba(31, 255, 147, ${alpha * 0.58})`;
+              ? `rgba(168, 85, 247, ${alpha * 0.68})`
+              : `rgba(31, 255, 147, ${alpha * 0.74})`;
           drawingContext.fillText(stream.glyphs[index] ?? "0", stream.x, y);
         }
         stream.y += stream.speed * cell;
