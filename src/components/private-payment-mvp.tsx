@@ -15,12 +15,15 @@ import {
   STRK_MAINNET_TOKEN,
   buildSimplePaymentActions,
   formatStrkAmount,
-  receiptTouchesPool,
+  parseTransactionHistory,
+  receiptQualifiesForSubmission,
+  updateTransactionHistory,
   type PaymentOperation,
 } from "../lib/simple-mainnet-payment";
 
 const MAINNET_RPC = process.env.NEXT_PUBLIC_GIGSTARK_MAINNET_RPC ?? "https://starknet-rpc.publicnode.com";
 const HISTORY_KEY = "gigstark.mainnet-payment-hashes.v1";
+const VERIFIED_HISTORY_KEY = "gigstark.mainnet-payment-verified-hashes.v1";
 type Phase = "disconnected" | "connected" | "preparing" | "prepared" | "submitting" | "submitted" | "confirmed" | "blocked";
 
 export function PrivatePaymentMvp() {
@@ -40,6 +43,7 @@ export function PrivatePaymentMvp() {
   const [message, setMessage] = useState("Check a wallet, connect on Mainnet, then prepare one exact action.");
   const [hash, setHash] = useState("");
   const [history, setHistory] = useState<string[]>([]);
+  const [verifiedHistory, setVerifiedHistory] = useState<string[]>([]);
 
   useEffect(() => {
     const store = createStore();
@@ -48,7 +52,8 @@ export function PrivatePaymentMvp() {
     update(store.getWallets());
     const unsubscribe = store.subscribe(update);
     store._refreshInjectedWallets();
-    try { setHistory(JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "[]")); } catch { setHistory([]); }
+    setHistory(parseTransactionHistory(localStorage.getItem(HISTORY_KEY)));
+    setVerifiedHistory(parseTransactionHistory(localStorage.getItem(VERIFIED_HISTORY_KEY)));
     return () => { unsubscribe(); storeRef.current = null; };
   }, []);
 
@@ -141,7 +146,7 @@ export function PrivatePaymentMvp() {
       await verifyReviewedPoolTarget(provider, STRK20_MAINNET_REVIEW_TARGET);
       await account.strk20PrepareInvoke(prepared, true);
       const result = await account.strk20InvokeTransaction(prepared);
-      const nextHistory = Array.from(new Set([result.transaction_hash, ...history])).slice(0, 12);
+      const nextHistory = updateTransactionHistory(history, result.transaction_hash);
       localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
       setHistory(nextHistory); setHash(result.transaction_hash); setPhase("submitted");
       setMessage("Submitted. Preserve this hash even if the selected RPC has not indexed it yet.");
@@ -156,11 +161,13 @@ export function PrivatePaymentMvp() {
     try {
       const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
       const receipt = await provider.getTransactionReceipt(candidate);
-      if (!receiptTouchesPool(receipt, STRK20_MAINNET_REVIEW_TARGET.address)) {
-        throw new Error("Receipt is not yet successful or no STRK20 pool event was found.");
+      if (!receiptQualifiesForSubmission(receipt, STRK20_MAINNET_REVIEW_TARGET.address)) {
+        throw new Error("Receipt is not yet accepted and successful, or no STRK20 pool event was found.");
       }
-      setHash(candidate); setPhase("confirmed");
-      setMessage("Confirmed: successful Mainnet receipt with an event from the reviewed STRK20 pool.");
+      const nextVerified = updateTransactionHistory(verifiedHistory, candidate);
+      localStorage.setItem(VERIFIED_HISTORY_KEY, JSON.stringify(nextVerified));
+      setVerifiedHistory(nextVerified); setHash(candidate); setPhase("confirmed");
+      setMessage("Confirmed by the configured RPC: accepted, successful, and emitted an event from the reviewed STRK20 pool.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "RECEIPT_NOT_READY");
     }
@@ -171,10 +178,10 @@ export function PrivatePaymentMvp() {
     <div className="payment-heading"><div><p className="eyebrow">Live Mainnet MVP</p><h2 id="payment-title">One private payment flow. Three verifiable pool receipts.</h2><p>Wallet connection is the login. A resolved <code>.stark</code> name is a public display and recipient alias—not proof of private-pool identity.</p></div><span className="badge">SN_MAIN · POOL V2</span></div>
     <div className="payment-grid"><article><h3>1 · Connect</h3><button type="button" onClick={checkWallets}>Check compatible wallet</button><p>{walletName || `${wallets.length} installed wallet(s) discovered`}</p><button type="button" className="secondary" onClick={connect} disabled={!walletName || Boolean(account)}>{account ? "Wallet connected" : "Connect on Mainnet"}</button>{account ? <p className="mono">{identity || account.address}<br/><small>{identity ? account.address : "No primary .stark name resolved"}</small></p> : null}</article>
       <article><h3>2 · Prepare</h3><label>Action<select value={operation} onChange={(event) => { setOperation(event.target.value as PaymentOperation); resetPreparation(); }}><option value="shield">Shield STRK</option><option value="pay">Private creator payment</option><option value="withdraw">Withdraw STRK</option></select></label><label>Amount in STRK<input inputMode="decimal" placeholder="Example: 10" value={amount} onChange={(event) => { setAmount(event.target.value); resetPreparation(); }}/></label>{operation !== "shield" ? <label>{operation === "pay" ? "Creator .stark name or address" : "Public withdrawal address"}<input placeholder="creator.stark or 0x…" value={recipient} onChange={(event) => { setRecipient(event.target.value); resetPreparation(); }}/></label> : <p className="payment-note">Shielding may require a separate ERC-20 approval prompt. The approval does not count as a hackathon pool transaction.</p>}<button type="button" onClick={prepare} disabled={!account || phase === "preparing"}>{phase === "preparing" ? "Preparing…" : "Prepare and dry-run"}</button></article>
-      <article><h3>3 · Review and sign</h3><dl className="review-facts"><div><dt>Network</dt><dd>Starknet Mainnet</dd></div><div><dt>Action</dt><dd>{actionLabel}</dd></div><div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div><div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>{resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}<div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK (live read)` : "Available after dry run"}</dd></div></dl><label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)}/>I reviewed the Mainnet network, pool, action, token, amount, recipient, and fee.</label><button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase === "submitting"}>{phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}</button></article></div>
+      <article><h3>3 · Review and sign</h3><dl className="review-facts"><div><dt>Network</dt><dd>Starknet Mainnet</dd></div><div><dt>Pool</dt><dd>{STRK20_MAINNET_REVIEW_TARGET.address}</dd></div><div><dt>Action</dt><dd>{actionLabel}</dd></div><div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div><div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>{resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}<div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK (live read)` : "Available after dry run"}</dd></div></dl><label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)}/>I reviewed the Mainnet network, pool, action, token, amount, recipient, and fee.</label><button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase === "submitting"}>{phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}</button></article></div>
     <p className="wallet-flow-status" role="status">{message}</p>
     {hash ? <div className="receipt-card"><b>Latest transaction</b><a href={`https://voyager.online/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a><button type="button" className="secondary" onClick={() => void verifyReceipt()}>Verify receipt and pool event</button></div> : null}
-    {history.length ? <details className="transaction-history"><summary>Recover submitted hashes ({history.length})</summary>{history.map((item) => <div key={item}><a href={`https://voyager.online/tx/${item}`} target="_blank" rel="noreferrer">{item}</a><button type="button" className="secondary" onClick={() => void verifyReceipt(item)}>Verify</button></div>)}</details> : null}
+    {history.length ? <details className="transaction-history" open={verifiedHistory.length >= 3}><summary>Submission evidence · {verifiedHistory.length} verified / {history.length} submitted</summary>{history.map((item) => <div key={item}><a href={`https://voyager.online/tx/${item}`} target="_blank" rel="noreferrer">{item}</a>{verifiedHistory.includes(item) ? <strong className="verified-hash">Verified</strong> : <button type="button" className="secondary" onClick={() => void verifyReceipt(item)}>Verify</button>}</div>)}{verifiedHistory.length >= 3 ? <p className="manifest-hint">Three hashes passed the in-browser receipt check. Add the first three to both <code>strk20.json</code> files, then run the two-provider submission verifier before publishing.</p> : null}</details> : null}
     <p className="payment-boundary">Signing keys, viewing keys, notes, witnesses, proof generation, and private balances remain inside the wallet. Deposits and withdrawals are public; private transfers hide pool-side sender, recipient, and amount, while timing remains observable.</p>
   </section>;
 }

@@ -47,6 +47,11 @@ and amount public.
 
 Repeat the prepare, review, explicit-signature, preservation, and receipt checks.
 
+The site's **Submission evidence** panel keeps submitted and verified hashes
+separate. A green **Verified** label means that the configured Mainnet RPC saw
+an accepted, successful receipt with an event emitted by the reviewed pool. It
+does not replace the final two-provider verification below.
+
 ## Final verification
 
 1. Put the three distinct qualifying hashes in both `strk20.json` and

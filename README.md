@@ -23,7 +23,8 @@ Operator guides: [Mainnet payment runbook](docs/MAINNET_PAYMENT_RUNBOOK.md) ·
 - Exact network, pool, token, amount, recipient, and live-read pool-fee review.
 - Explicit user acknowledgement and wallet-controlled Mainnet submission.
 - Receipt verification requiring success and an event from the reviewed pool.
-- Browser-local recovery of submitted public transaction hashes.
+- Browser-local recovery that separates submitted hashes from receipts already
+  confirmed as accepted, successful, and pool-touching by the configured RPC.
 - A root `strk20.json` and static Cloudflare Pages deployment.
 
 The live Mainnet pool is

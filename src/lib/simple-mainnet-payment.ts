@@ -55,6 +55,44 @@ export function receiptTouchesPool(receipt: unknown, poolAddress: string): boole
   });
 }
 
+export function receiptQualifiesForSubmission(receipt: unknown, poolAddress: string): boolean {
+  if (!receiptTouchesPool(receipt, poolAddress)) return false;
+  const wrapper = receipt as Record<string, unknown>;
+  const record = wrapper.value && typeof wrapper.value === "object"
+    ? wrapper.value as Record<string, unknown>
+    : wrapper;
+  return record.finality_status === "ACCEPTED_ON_L1" || record.finality_status === "ACCEPTED_ON_L2";
+}
+
+export function updateTransactionHistory(history: readonly string[], candidate: string, limit = 12): string[] {
+  const normalized = normalizeTransactionHash(candidate);
+  const existing = history.flatMap((item) => {
+    try { return [normalizeTransactionHash(item)]; } catch { return []; }
+  });
+  return [normalized, ...existing.filter((item) => item !== normalized)].slice(0, limit);
+}
+
+export function parseTransactionHistory(value: string | null): string[] {
+  if (!value) return [];
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.reduce<string[]>((history, item) => {
+      if (typeof item !== "string") return history;
+      try { return updateTransactionHistory(history, item); } catch { return history; }
+    }, []).reverse();
+  } catch {
+    return [];
+  }
+}
+
+function normalizeTransactionHash(value: string): string {
+  if (!/^0x[0-9a-fA-F]{1,64}$/.test(value) || BigInt(value) === 0n) {
+    throw new Error("INVALID_TRANSACTION_HASH");
+  }
+  return `0x${BigInt(value).toString(16)}`;
+}
+
 function requireAddress(value?: string): string {
   if (!value) throw new Error("RECIPIENT_REQUIRED");
   try {

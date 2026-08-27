@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STRK20_MAINNET_REVIEW_TARGET } from "../src/lib/strk20-wallet";
-import { buildSimplePaymentActions, formatStrkAmount, parseStrkAmount, receiptTouchesPool } from "../src/lib/simple-mainnet-payment";
+import { buildSimplePaymentActions, formatStrkAmount, parseStrkAmount, parseTransactionHistory, receiptQualifiesForSubmission, receiptTouchesPool, updateTransactionHistory } from "../src/lib/simple-mainnet-payment";
 
 test("parses exact STRK amounts without floating point", () => {
   assert.equal(parseStrkAmount("1"), "0xde0b6b3a7640000");
@@ -25,4 +25,17 @@ test("qualifying receipt must succeed and contain a pool-originated event", () =
   assert.equal(receiptTouchesPool({ execution_status: "SUCCEEDED", events: [{ from_address: pool }] }, pool), true);
   assert.equal(receiptTouchesPool({ execution_status: "REVERTED", events: [{ from_address: pool }] }, pool), false);
   assert.equal(receiptTouchesPool({ execution_status: "SUCCEEDED", events: [{ from_address: "0x123" }] }, pool), false);
+});
+
+test("submission receipt must also be accepted", () => {
+  const pool = STRK20_MAINNET_REVIEW_TARGET.address;
+  assert.equal(receiptQualifiesForSubmission({ execution_status: "SUCCEEDED", finality_status: "ACCEPTED_ON_L2", events: [{ from_address: pool }] }, pool), true);
+  assert.equal(receiptQualifiesForSubmission({ execution_status: "SUCCEEDED", finality_status: "RECEIVED", events: [{ from_address: pool }] }, pool), false);
+});
+
+test("transaction recovery normalizes, deduplicates, and rejects malformed storage", () => {
+  assert.deepEqual(updateTransactionHistory(["0x01", "0x2"], "0x1"), ["0x1", "0x2"]);
+  assert.deepEqual(parseTransactionHistory('["0x1","bad",3,"0x02"]'), ["0x1", "0x2"]);
+  assert.deepEqual(parseTransactionHistory("not json"), []);
+  assert.throws(() => updateTransactionHistory([], "0x0"), /INVALID_TRANSACTION_HASH/);
 });
