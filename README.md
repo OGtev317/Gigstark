@@ -3,8 +3,9 @@
 Gigstark is a non-custodial STRK20 interface for private creator payments on
 Starknet Mainnet. A client can shield STRK, pay a registered creator inside the
 privacy pool, and withdraw. The connected wallet keeps every signing key,
-viewing key, private note, witness, and proof; Gigstark receives only the
-requested public action fields and the resulting transaction hash.
+viewing key, private note, and witness. Gigstark sends only the requested public
+action fields, does not inspect or persist dry-run proof output, and retains only
+public transaction hashes for recovery.
 
 Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 

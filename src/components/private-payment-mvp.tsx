@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createStore, type Store } from "@starknet-io/get-starknet-discovery";
 import type { WalletWithStarknetFeatures } from "@starknet-io/get-starknet-wallet-standard/features";
-import { RpcProvider, WalletAccountV6, type STRK20_ACTION } from "starknet";
+import { RpcProvider, WalletAccountV6, walletV6, type STRK20_ACTION } from "starknet";
 import {
   STRK20_MAINNET_REVIEW_TARGET,
   STRK20_WALLET_API_MIN_VERSION,
   detectStrk20WalletApi,
   verifyReviewedPoolTarget,
 } from "../lib/strk20-wallet";
-import { requireMainnetWalletAccount, walletFlowErrorMessage } from "../lib/wallet-review";
+import { requireMainnetWalletAccount, requireMainnetWalletChain, walletFlowErrorMessage } from "../lib/wallet-review";
 import {
   STRK_MAINNET_TOKEN,
   buildSimplePaymentActions,
@@ -46,12 +46,11 @@ export function PrivatePaymentMvp() {
   const [verifiedHistory, setVerifiedHistory] = useState<string[]>([]);
 
   useEffect(() => {
-    const store = createStore();
+    const store = createStore({ eip1193Adapters: [] });
     storeRef.current = store;
     const update = (next: readonly WalletWithStarknetFeatures[]) => setWallets(next);
     update(store.getWallets());
     const unsubscribe = store.subscribe(update);
-    store._refreshInjectedWallets();
     setHistory(parseTransactionHistory(localStorage.getItem(HISTORY_KEY)));
     setVerifiedHistory(parseTransactionHistory(localStorage.getItem(VERIFIED_HISTORY_KEY)));
     return () => { unsubscribe(); storeRef.current = null; };
@@ -60,13 +59,13 @@ export function PrivatePaymentMvp() {
   useEffect(() => {
     if (!account) return;
     return account.onChange(() => {
-      setAccount(null); setPrepared(null); setAcknowledged(false); setPhase("disconnected");
+      setAccount(null); setIdentity(""); setFee(""); setPrepared(null); setAcknowledged(false); setPhase("disconnected");
       setMessage("The wallet account or network changed. Reconnect and prepare again.");
     });
   }, [account]);
 
   function resetPreparation() {
-    setPrepared(null); setAcknowledged(false); setResolvedRecipient(""); setFee("");
+    setPrepared(null); setAcknowledged(false); setResolvedRecipient("");
     if (account) setPhase("connected");
   }
 
@@ -96,14 +95,17 @@ export function PrivatePaymentMvp() {
       if (!capability.supported) throw new Error("WALLET_API_UNSUPPORTED");
       const connection = await wallet.features["standard:connect"].connect();
       const connected = requireMainnetWalletAccount(connection.accounts);
+      requireMainnetWalletChain(String(await walletV6.requestChainId(wallet)));
       const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
       const nextAccount = new WalletAccountV6({ provider, walletProvider: wallet, address: connected.address });
       await verifyReviewedPoolTarget(provider, STRK20_MAINNET_REVIEW_TARGET);
+      const feeResult = await provider.callContract({ contractAddress: STRK20_MAINNET_REVIEW_TARGET.address, entrypoint: "get_fee_amount", calldata: [] });
+      setFee(formatStrkAmount(feeResult[0] ?? "0x0"));
       setAccount(nextAccount); setPhase("connected");
       try { setIdentity(await provider.getStarkName(connected.address)); } catch { setIdentity(""); }
       setMessage("Connected to the reviewed Mainnet pool. No balance or private note was requested.");
     } catch (error) {
-      setAccount(null); setPhase("blocked"); setMessage(walletFlowErrorMessage(error));
+      setAccount(null); setFee(""); setPhase("blocked"); setMessage(walletFlowErrorMessage(error));
     }
   }
 
@@ -128,8 +130,9 @@ export function PrivatePaymentMvp() {
       const target = await resolveTarget(provider);
       const actions = buildSimplePaymentActions(operation, amount, target);
       const feeResult = await provider.callContract({ contractAddress: STRK20_MAINNET_REVIEW_TARGET.address, entrypoint: "get_fee_amount", calldata: [] });
+      setFee(formatStrkAmount(feeResult[0] ?? "0x0"));
       await account.strk20PrepareInvoke(actions, true);
-      setFee(formatStrkAmount(feeResult[0] ?? "0x0")); setResolvedRecipient(target ?? "");
+      setResolvedRecipient(target ?? "");
       setPrepared(actions); setAcknowledged(false); setPhase("prepared");
       setMessage("Dry run completed. Review the exact public fields and pool fee before signing.");
     } catch (error) {
@@ -144,12 +147,15 @@ export function PrivatePaymentMvp() {
     try {
       const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
       await verifyReviewedPoolTarget(provider, STRK20_MAINNET_REVIEW_TARGET);
-      await account.strk20PrepareInvoke(prepared, true);
       const result = await account.strk20InvokeTransaction(prepared);
       const nextHistory = updateTransactionHistory(history, result.transaction_hash);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
       setHistory(nextHistory); setHash(result.transaction_hash); setPhase("submitted");
-      setMessage("Submitted. Preserve this hash even if the selected RPC has not indexed it yet.");
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
+        setMessage("Submitted. Preserve this hash even if the selected RPC has not indexed it yet.");
+      } catch {
+        setMessage("Submitted, but browser recovery storage is unavailable. Copy the displayed hash now.");
+      }
     } catch (error) {
       setPhase("blocked"); setMessage(walletFlowErrorMessage(error));
     }
@@ -165,9 +171,13 @@ export function PrivatePaymentMvp() {
         throw new Error("Receipt is not yet accepted and successful, or no STRK20 pool event was found.");
       }
       const nextVerified = updateTransactionHistory(verifiedHistory, candidate);
-      localStorage.setItem(VERIFIED_HISTORY_KEY, JSON.stringify(nextVerified));
       setVerifiedHistory(nextVerified); setHash(candidate); setPhase("confirmed");
-      setMessage("Confirmed by the configured RPC: accepted, successful, and emitted an event from the reviewed STRK20 pool.");
+      try {
+        localStorage.setItem(VERIFIED_HISTORY_KEY, JSON.stringify(nextVerified));
+        setMessage("Confirmed by the configured RPC: accepted, successful, and emitted an event from the reviewed STRK20 pool.");
+      } catch {
+        setMessage("Receipt confirmed, but browser recovery storage is unavailable. Copy the displayed hash now.");
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "RECEIPT_NOT_READY");
     }

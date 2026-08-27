@@ -4,6 +4,7 @@ import {
   STARKNET_MAINNET_WALLET_CHAIN,
   STARKNET_SEPOLIA_WALLET_CHAIN,
   requireMainnetWalletAccount,
+  requireMainnetWalletChain,
   requireSepoliaWalletAccount,
   walletFlowErrorMessage,
   walletReviewControls,
@@ -30,6 +31,9 @@ test("wallet readiness accepts only a connected Starknet Mainnet account", () =>
     /WALLET_WRONG_MAINNET_CHAIN/,
   );
   assert.throws(() => requireMainnetWalletAccount([]), /WALLET_CONNECTION_REJECTED/);
+  assert.equal(requireMainnetWalletChain("0x534e5f4d41494e"), "0x534e5f4d41494e");
+  assert.equal(requireMainnetWalletChain("SN_MAIN"), "SN_MAIN");
+  assert.throws(() => requireMainnetWalletChain("SN_SEPOLIA"), /WALLET_WRONG_MAINNET_CHAIN/);
 });
 
 test("wallet review accepts only a connected Starknet Sepolia account", () => {

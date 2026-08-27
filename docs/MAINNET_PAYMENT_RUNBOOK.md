@@ -16,6 +16,9 @@ key, seed phrase, note, or proof witness.
    registration transaction among the three competition transactions.
 5. Confirm the site displays pool
    `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a`.
+6. After connecting, confirm the site shows a live-read pool fee before choosing
+   the shield amount. Leave enough STRK for the shield value, pool operations,
+   and any wallet-disclosed gas.
 
 ## Transaction 1: shield
 

@@ -43,6 +43,13 @@ export function requireMainnetWalletAccount(
   return account;
 }
 
+export function requireMainnetWalletChain(chainId: string): string {
+  if (!isMainnetWalletChain(chainId.startsWith("starknet:") ? chainId : `starknet:${chainId}`)) {
+    throw new Error("WALLET_WRONG_MAINNET_CHAIN");
+  }
+  return chainId;
+}
+
 export function walletReviewControls(
   phase: WalletReviewPhase,
   acknowledged: boolean,
