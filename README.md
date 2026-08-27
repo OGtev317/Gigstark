@@ -1,76 +1,49 @@
 # Gigstark
 
-Gigstark is a non-custodial STRK20 prototype centered on encrypted
-creator-member messaging and private subscriptions/creator monetization on
-Starknet. Private freelance milestones and proof-gated access support those
-two hackathon pillars. Its settlement center is a
-directly verified ZK proof. Marlin Oyster can add a separately verifiable TEE
-receipt for confidential execution, but that optional receipt cannot authorize,
-block, or override settlement. It is a standalone project and does not use
-Athera L1 or L3.
+Gigstark is a non-custodial STRK20 interface for private creator payments on
+Starknet Mainnet. A client can shield STRK, pay a registered creator inside the
+privacy pool, and withdraw. The connected wallet keeps every signing key,
+viewing key, private note, witness, and proof; Gigstark receives only the
+requested public action fields and the resulting transaction hash.
 
 Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 
-## What runs now
+## Competition MVP
 
-- A session-only ECDH/AES-GCM creator-member messaging demo that excludes
-  plaintext and private encryption keys from its portable ciphertext envelope,
-  detects tampering, and permits only the intended recipient to decrypt.
-- Browser-local creator/member profiles, listings, proposals, orders,
-  reputation, tier-feed entries, bounded subscription plans, and explicitly
-  non-authoritative receipt labels, with versioned local JSON export/import.
-- A browser-only escrow state-machine demo: deposit → delivery commitment → buyer confirmation or dispute outcome → one private-note claim.
-- Tests for ordering, replay protection, double-claim rejection, seller settlement, and buyer dispute outcomes.
-- A bounded subscription state machine: one paid period, maximum three prepaid periods, cancellation, expiry, and one creator claim per period.
-- A Passport-inspired tier-receipt verifier model: exact audience/tier binding, policy and receipt expiry, and scoped replay rejection—without wallet scanning.
-- GigstarkPassport: a new minimum-disclosure, purpose-bound claim policy model with opaque proof commitments and scoped replay protection.
-- A clean-room Cairo passport receipt verifier connected to escrow role
-  authorization and an audience-bound tier gate.
-- A clean-room `GigstarkComputeVerifier` that directly calls a policy-pinned
-  BN254 Groth16 verifier, checks all eight public signals, derives a one-use
-  result nullifier, and treats an Oyster receipt commitment as optional
-  non-authoritative evidence.
-- A real BN254 Groth16 proof over one synthetic seller-winning dispute and a
-  Garaga `1.1.0` Cairo verifier whose integration test authorizes the real
-  Gigstark settlement verifier and whose negative test rejects tampering.
-- A Mac-compatible Oyster receipt lane pinned to `oyster-cvm 5.0.1`, with an
-  immutable-image requirement and offline certificate, freshness, image-ID,
-  and `user_data` verification command. No Oyster job has been deployed.
-- A Wallet API preparation layer for private `withdraw -> invoke` deposits and
-  `open transfer -> invoke` winner claims, guarded by exact pool address and
-  class checks.
-- A read-only dual-network pool gate: Sepolia remains a source-provenance
-  diagnostic, while source-reproduced STRK20 V2 on Mainnet is the hackathon
-  release target.
-- A browser review flow that detects capability without balance access, checks
-  the connected wallet network, dry-runs the exact deposit and winner-note
-  actions, and enables each explicit signature request only after separate user
-  acknowledgement.
-- A safe product boundary: Gigstark never requests or stores a private key,
-  viewing key, private note, or private witness.
-- A root `strk20.json` submission manifest and static Cloudflare Pages export.
+- Wallet API capability detection without a private-balance probe.
+- Strict `SN_MAIN` connection and reviewed STRK20 V2 pool/class verification.
+- Pool-native shield, private-transfer, and withdrawal actions for STRK.
+- Exact decimal parsing without JavaScript floating-point arithmetic.
+- Optional `.stark` name resolution through Starknet.js. Wallet connection is
+  the login; a public name is only a display and recipient alias.
+- Mandatory wallet dry-run before the signature button is enabled.
+- Exact network, pool, token, amount, recipient, and live-read pool-fee review.
+- Explicit user acknowledgement and wallet-controlled Mainnet submission.
+- Receipt verification requiring success and an event from the reviewed pool.
+- Browser-local recovery of submitted public transaction hashes.
+- A root `strk20.json` and static Cloudflare Pages deployment.
 
-## What is intentionally not live
+The live Mainnet pool is
+`0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a`.
+Deposits and withdrawals are public. Transfers inside the pool hide the
+pool-side sender, recipient, amount, and spent notes; timing remains observable.
 
-No messaging contract, relay, indexer, or chain publication path is wired.
-The encrypted-message demo uses session-only browser keys and makes no claim
-that messaging is live onchain. Local marketplace and subscription records are
-not shared data, payment evidence, or access authority.
+## Post-hackathon roadmap
 
-The UI contains an explicit prepare-then-sign transaction flow, but the current
-live Sepolia pool class is intentionally rejected before wallet preparation or
-submission because it has not been reproduced from a reviewed source build.
-The source-reproduced Mainnet V2 class has a separate read-only health and class
-gate plus a library-only dry-run preparation path. The public UI and submission
-path remain disabled for Mainnet; no declaration, deployment, or fund movement
-is enabled.
-Capability detection does not connect a wallet or request private balances.
-Once the user explicitly connects, note discovery, proving, and signing remain
-inside the wallet. Gigstark must never collect viewing or spending keys.
-Autonomous recurring charges remain disabled until scoped session authority is
-separately reviewed.
+The repository preserves experimental escrow, subscription, Passport, tier,
+custom-ZK, encrypted-messaging, and Oyster/TEE work, but none of it is part of
+the competition MVP or advertised as live. Custom contracts remain deployment-
+gated pending independent review and production governance inputs.
 
-STRK20 can hide parties inside the pool and make Gigstark role commitments unlinkable. It does **not** make helper amount or timing cryptographically private: deposits, withdrawals, helper interactions, amounts at helper boundaries, and timing can be observable.
+No Oyster job has been deployed. A future live TEE claim requires a reproducible
+immutable workload image, matching image ID, a real Oyster job, raw Nitro
+attestation verification including the AWS root and certificate chain,
+measurements, freshness, and workload-bound `user_data`. Any TEE result remains
+optional and non-authoritative for settlement.
+
+The hosted Starknet ID API is not an authentication service and is not required
+by Gigstark. The wallet proves account control by approving the connection and
+signs every transaction itself.
 
 ## Run locally
 
