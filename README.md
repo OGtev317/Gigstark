@@ -26,6 +26,8 @@ Operator guides: [Mainnet payment runbook](docs/MAINNET_PAYMENT_RUNBOOK.md) ·
 - Receipt verification requiring success and an event from the reviewed pool.
 - Browser-local recovery that separates submitted hashes from receipts already
   confirmed as accepted, successful, and pool-touching by the configured RPC.
+- A minimal three-receipt operating route: creator shield, client shield, then
+  one private creator payment after note maturity.
 - A root `strk20.json` and static Cloudflare Pages deployment.
 
 The live Mainnet pool is

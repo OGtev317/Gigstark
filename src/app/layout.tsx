@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./qualifying-route.css";
 import "./starknet-theme.css";
 
 export const metadata: Metadata = {

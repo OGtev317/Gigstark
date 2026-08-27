@@ -9,46 +9,48 @@ key, seed phrase, note, or proof witness.
 1. Use the live site at <https://gigstark.pages.dev> and a wallet that reports
    Wallet API `0.10.3` or newer in the site's capability check.
 2. Select Starknet Mainnet (`SN_MAIN`) in the wallet.
-3. Fund the client wallet with enough STRK for the test value, current pool
-   fees, and any wallet-disclosed gas. The site reads the pool fee live.
-4. Prepare a second creator wallet. The creator must register itself with the
-   privacy pool before it can receive a private transfer. Do not count the
-   registration transaction among the three competition transactions.
+3. Prepare separate creator and client wallets. Fund each only with the reviewed
+   amount needed for its shield, current pool fees, and any wallet-disclosed
+   gas. The site reads the pool fee live.
+4. Neither wallet needs a separate uncounted registration transaction: the
+   wallet registers itself during its first shield when required.
 5. Confirm the site displays pool
    `0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a`.
 6. After connecting, confirm the site shows a live-read pool fee before choosing
    the shield amount. Leave enough STRK for the shield value, pool operations,
    and any wallet-disclosed gas.
 
-## Transaction 1: shield
+## Transaction 1: creator onboarding shield
 
-1. Choose **Shield STRK** and enter a reviewed amount that covers the later
-   payments and pool fees.
+1. Connect the creator wallet, choose **Shield STRK**, and enter a reviewed
+   amount. This pool transaction registers the creator when needed and counts
+   as the first competition receipt.
 2. Run **Prepare and dry-run**.
 3. Review network, pool, token, amount, and live fee; acknowledge them.
 4. Request the Mainnet signature. The wallet may first request an ERC-20
    approval and then the pool deposit. The approval does not qualify; preserve
    the pool-deposit hash returned by Gigstark.
-5. Use **Verify receipt and pool event**. Wait about ten blocks before spending
-   the new note.
+5. Use **Verify receipt and pool event**. Preserve the green **Verified** hash.
 
-## Transaction 2: private creator payment
+## Transaction 2: client shield
 
-1. Choose **Private creator payment**.
-2. Enter the creator's registered address or `.stark` name and a small reviewed
-   STRK amount.
+1. Switch to the client wallet and reconnect Gigstark.
+2. Choose **Shield STRK** and enter enough to cover the intended creator
+   payment and later pool fee.
+3. Dry-run, review, acknowledge, and sign. Preserve the pool-deposit hash rather
+   than any ERC-20 approval hash.
+4. Verify the receipt and wait about ten blocks for the client's new note to
+   mature before paying the creator.
+
+## Transaction 3: private creator payment
+
+1. Keep the client wallet connected and choose **Private creator payment**.
+2. Enter the creator's now-registered address or `.stark` name and a small
+   reviewed STRK amount.
 3. Dry-run, review the resolved address and live fee, acknowledge, and sign.
 4. Preserve the relayed transaction hash. Do not infer the payer from the
    transaction sender; private submissions use a relayer.
 5. Verify the successful receipt and pool event in Gigstark.
-
-## Transaction 3
-
-Prefer a second real private creator payment to demonstrate repeated product
-use. A withdrawal is also a pool-native Gigstark action but makes its recipient
-and amount public.
-
-Repeat the prepare, review, explicit-signature, preservation, and receipt checks.
 
 The site's **Submission evidence** panel keeps submitted and verified hashes
 separate. A green **Verified** label means that the configured Mainnet RPC saw
