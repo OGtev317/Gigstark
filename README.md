@@ -8,6 +8,9 @@ requested public action fields and the resulting transaction hash.
 
 Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 
+Operator guides: [Mainnet payment runbook](docs/MAINNET_PAYMENT_RUNBOOK.md) ·
+[three-minute demo script](docs/DEMO_SCRIPT.md)
+
 ## Competition MVP
 
 - Wallet API capability detection without a private-balance probe.
@@ -55,6 +58,7 @@ npm run build
 npm run verify:starknet-health
 npm run verify:strk20-pool # expected to fail closed until source reproduction
 npm run verify:strk20-mainnet # read-only Mainnet V2 health and class gate
+npm run verify:hackathon-submission # fails until hashes and video are complete
 npm run review:mainnet-deployment # expected to fail until public review inputs are complete
 npm run proof:verify
 # npm run compute:verify requires Scarb 2.17.0 and snforge 0.59.0

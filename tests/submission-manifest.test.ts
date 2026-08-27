@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { parseHackathonSubmission } from "../src/lib/hackathon-submission";
 
 type SubmissionManifest = {
   transactions: unknown;
@@ -20,8 +21,7 @@ test("repository and public STRK20 submission manifests stay identical and hones
   ]);
 
   assert.deepEqual(publicManifest, repositoryManifest);
-  assert.deepEqual(repositoryManifest.transactions, []);
+  parseHackathonSubmission(repositoryManifest);
   assert.deepEqual(repositoryManifest.contracts, []);
-  assert.equal(repositoryManifest.demo_video, "");
   assert.equal(repositoryManifest.demo_url, "https://gigstark.pages.dev");
 });

@@ -41,7 +41,10 @@ export function buildSimplePaymentActions(
 
 export function receiptTouchesPool(receipt: unknown, poolAddress: string): boolean {
   if (!receipt || typeof receipt !== "object") return false;
-  const record = receipt as Record<string, unknown>;
+  const wrapper = receipt as Record<string, unknown>;
+  const record = wrapper.value && typeof wrapper.value === "object"
+    ? wrapper.value as Record<string, unknown>
+    : wrapper;
   if (record.execution_status === "REVERTED") return false;
   if (record.execution_status !== "SUCCEEDED") return false;
   const events = Array.isArray(record.events) ? record.events : [];

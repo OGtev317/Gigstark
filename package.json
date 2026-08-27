@@ -16,6 +16,7 @@
     "verify:strk20-artifacts": "tsx scripts/reproduce-strk20-live-artifacts.ts",
     "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts",
     "verify:strk20-mainnet": "tsx scripts/verify-strk20-mainnet.ts",
+    "verify:hackathon-submission": "tsx scripts/verify-hackathon-submission.ts",
     "review:mainnet-deployment": "tsx scripts/review-mainnet-deployment.ts"
   },
   "dependencies": {
