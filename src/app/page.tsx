@@ -10,16 +10,17 @@ export default function Home() {
         <nav aria-label="Primary navigation">
           <a className="mark" href="#top">ZEERO<span>STREAM</span></a>
           <span className="badge">PRIVATE SPRINT MVP</span>
-          <a href="#pay">Make a payment</a>
+          <a href="#creator">Creator page</a>
+          <a href="#pay">Private pay</a>
           <a href="#evidence">Evidence</a>
         </nav>
 
         <section id="top" className="hero">
-          <p className="eyebrow">Private creator payments · Starknet Mainnet</p>
-          <h1>Pay for the work.<br /><em>Hide the relationship.</em></h1>
-          <p className="lede">ZeeroStream is a non-custodial STRK20 payment interface for clients and creators. Shield STRK, pay a registered creator privately, and keep every wallet key and proof inside your wallet.</p>
+          <p className="eyebrow">Premium creator payments · Starknet Mainnet</p>
+          <h1>Creator access without the public wallet trail.</h1>
+          <p className="lede">ZeeroStream gives paid creator pages a private checkout lane. Subscribers can send a STRK20 payment with an encrypted memo receipt while wallet keys, notes, and proofs stay inside their own wallet.</p>
           <div className="hero-actions">
-            <a className="button" href="#pay">Open Mainnet payment flow</a>
+            <a className="button" href="#creator">View creator page</a>
             <a href="#boundaries">Understand privacy</a>
             <span>Wallet-signed · Mainnet pool V2 · no custody</span>
           </div>
@@ -28,6 +29,66 @@ export default function Home() {
             <li><b>0</b><span>Private keys handled by ZeeroStream</span></li>
             <li><b>2 RPCs</b><span>Independent receipt agreement</span></li>
           </ul>
+        </section>
+
+        <section id="creator" className="creator-social" aria-label="Creator social preview">
+          <div className="creator-cover">
+            <div className="creator-avatar" aria-hidden="true">ZS</div>
+            <div>
+              <p className="eyebrow">Featured creator page</p>
+              <h2>Zero Studio</h2>
+              <p>Private drops, paid replies, encrypted payment memos, and receipts a creator can read locally.</p>
+            </div>
+            <a className="button" href="#pay">Subscribe privately</a>
+          </div>
+
+          <div className="creator-dashboard">
+            <article className="creator-feed">
+              <div className="feed-heading">
+                <div>
+                  <p className="eyebrow">Latest posts</p>
+                  <h3>Subscriber feed</h3>
+                </div>
+                <span>3 locked drops</span>
+              </div>
+              <div className="social-post unlocked">
+                <span className="post-media" aria-hidden="true" />
+                <div>
+                  <b>Public preview</b>
+                  <p>New paid drop is live. Pay privately and attach a receipt memo for custom delivery.</p>
+                  <small>Visible to everyone</small>
+                </div>
+              </div>
+              <div className="social-post locked">
+                <span className="post-media" aria-hidden="true" />
+                <div>
+                  <b>Studio tier drop</b>
+                  <p>Private media request notes are encrypted before the transaction is signed.</p>
+                  <small>Unlock with private payment</small>
+                </div>
+              </div>
+            </article>
+
+            <article className="membership-panel">
+              <p className="eyebrow">Creator checkout</p>
+              <h3>Support without exposing the relationship.</h3>
+              <div className="tier-price"><b>10 STRK</b><span>private payment</span></div>
+              <ul>
+                <li>Encrypted memo receipt</li>
+                <li>Creator-local inbox demo</li>
+                <li>Receipt hash for verification</li>
+              </ul>
+              <a className="button" href="#pay">Start checkout</a>
+            </article>
+
+            <article className="inbox-panel">
+              <p className="eyebrow">Creator inbox</p>
+              <h3>Memo receipt ready</h3>
+              <p>Only the intended creator key can decrypt the attached note. ZeeroStream stores ciphertext and payment binding only.</p>
+              <div className="inbox-row"><span>Payment hash</span><b>verified</b></div>
+              <div className="inbox-row"><span>Memo content</span><b>encrypted</b></div>
+            </article>
+          </div>
         </section>
 
         <section className="architecture" aria-label="How a private creator payment works">
