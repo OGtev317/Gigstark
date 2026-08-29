@@ -7,7 +7,7 @@ import {
   type GigstarkProfile, type MarketplaceState,
 } from "../lib/marketplace";
 
-const STORAGE_KEY = "gigstark.marketplace.v1";
+const STORAGE_KEY = "zeerostream.marketplace.v1";
 
 function id(prefix: string) { return `${prefix}-${crypto.randomUUID()}`; }
 

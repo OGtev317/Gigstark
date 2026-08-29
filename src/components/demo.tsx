@@ -26,7 +26,7 @@ export function Demo() {
   };
   const reset = () => { setEscrow(initial()); setNotice("Demo reset. The state machine has no persistence."); };
 
-  return <section className="demo" aria-label="Gigstark escrow walkthrough">
+  return <section className="demo" aria-label="Zeerostream escrow walkthrough">
     <div className="demo-top"><div><p className="eyebrow">Must-ship demo</p><h2>Private milestone settlement</h2></div><button className="secondary" onClick={reset}>Reset</button></div>
     <div className="roles"><span>Buyer commitment: <b>{escrow.buyerCommitment}</b></span><span>Seller commitment: <b>{escrow.sellerCommitment}</b></span><span>Amount: <b>not sent</b></span></div>
     <div className="step-grid">{steps.map(([name, state]) => <div key={name} className={`step ${state}`}><i />{name}<small>{state}</small></div>)}</div>

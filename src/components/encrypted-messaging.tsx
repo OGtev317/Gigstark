@@ -20,7 +20,7 @@ export function EncryptedMessaging() {
     if (!creator || !member) return;
     const target = recipient === "creator" ? creator : member;
     const sender = recipient === "creator" ? member : creator;
-    try { const envelope = await encryptMessage({ id: `message-${crypto.randomUUID()}`, threadCommitment: "gigstark:creator-member:demo", sender, recipientPublicKey: target.publicKey, plaintext: body }); setMessages((current) => [{ envelope, recipient }, ...current]); setBody(""); setNotice("Encrypted envelope prepared locally. Its SHA-256 anchor is visible; plaintext and private keys are not included."); } catch (error) { setNotice(error instanceof Error ? error.message : "MESSAGE_ENCRYPTION_FAILED"); }
+    try { const envelope = await encryptMessage({ id: `message-${crypto.randomUUID()}`, threadCommitment: "zeerostream:creator-member:demo", sender, recipientPublicKey: target.publicKey, plaintext: body }); setMessages((current) => [{ envelope, recipient }, ...current]); setBody(""); setNotice("Encrypted envelope prepared locally. Its SHA-256 anchor is visible; plaintext and private keys are not included."); } catch (error) { setNotice(error instanceof Error ? error.message : "MESSAGE_ENCRYPTION_FAILED"); }
   }
   async function reveal(message: LocalMessage) {
     const identity = message.recipient === "creator" ? creator : member;

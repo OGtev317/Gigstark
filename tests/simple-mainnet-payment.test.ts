@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STRK20_MAINNET_REVIEW_TARGET } from "../src/lib/strk20-wallet";
-import { buildSimplePaymentActions, formatStrkAmount, isFirstShieldRegistrationRequired, parseStrkAmount, parseTransactionHistory, receiptQualifiesForSubmission, receiptTouchesPool, updateTransactionHistory } from "../src/lib/simple-mainnet-payment";
+import { buildSimplePaymentActions, formatStrkAmount, isFirstShieldRegistrationRequired, parseStrkAmount, parseTransactionHistory, paymentPreparationErrorMessage, receiptQualifiesForSubmission, receiptTouchesPool, updateTransactionHistory } from "../src/lib/simple-mainnet-payment";
 
 test("parses exact STRK amounts without floating point", () => {
   assert.equal(parseStrkAmount("1"), "0xde0b6b3a7640000");
@@ -26,6 +26,12 @@ test("only recognizes the wallet's exact first-shield registration signal", () =
   assert.equal(isFirstShieldRegistrationRequired(new Error("An error occurred (NOT_REGISTERED)")), true);
   assert.equal(isFirstShieldRegistrationRequired(new Error("NOT_REGISTERED_EXTRA")), false);
   assert.equal(isFirstShieldRegistrationRequired("NOT_REGISTERED"), false);
+});
+
+test("turns preparation codes into actionable, privacy-safe messages", () => {
+  assert.match(paymentPreparationErrorMessage(new Error("INVALID_STRK_AMOUNT")), /greater than zero/);
+  assert.match(paymentPreparationErrorMessage(new Error("STARK_NAME_NOT_FOUND")), /did not resolve/);
+  assert.match(paymentPreparationErrorMessage(new Error("unexpected")), /could not prepare/);
 });
 
 test("qualifying receipt must succeed and contain a pool-originated event", () => {

@@ -5,6 +5,19 @@ export const STRK_MAINNET_TOKEN =
 
 export type PaymentOperation = "shield" | "pay" | "withdraw";
 
+const PREPARATION_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  INVALID_STRK_AMOUNT: "Enter a STRK amount greater than zero, using no more than 18 decimal places.",
+  RECIPIENT_REQUIRED: "Enter the creator's .stark name or Starknet address.",
+  INVALID_RECIPIENT: "Enter a valid Starknet recipient address.",
+  STARK_NAME_NOT_FOUND: "That .stark name did not resolve on Starknet Mainnet.",
+};
+
+export function paymentPreparationErrorMessage(error: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  return PREPARATION_ERROR_MESSAGES[code]
+    ?? "The wallet could not prepare this action. Check the fields, wallet network, and note maturity, then try again.";
+}
+
 /**
  * A privacy wallet can require its first pool deposit to register the sender.
  * Registration changes pool state, so a simulated invoke may return this exact

@@ -17,15 +17,40 @@ import {
   formatStrkAmount,
   isFirstShieldRegistrationRequired,
   parseTransactionHistory,
+  paymentPreparationErrorMessage,
   receiptQualifiesForSubmission,
   updateTransactionHistory,
   type PaymentOperation,
 } from "../lib/simple-mainnet-payment";
+import {
+  bindPaymentMemoReceipt,
+  createMessagingIdentity,
+  createPaymentMemoContact,
+  decryptPaymentMemo,
+  encryptPaymentMemo,
+  parsePaymentMemoReceipt,
+  parsePaymentMemoReceiptHistory,
+  paymentMemoCommitmentForFields,
+  updatePaymentMemoReceipts,
+  type MessagingIdentity,
+  type PaymentMemoReceipt,
+  type PendingPaymentMemo,
+} from "../lib/private-messaging";
 
 const MAINNET_RPC = process.env.NEXT_PUBLIC_GIGSTARK_MAINNET_RPC ?? "https://starknet-rpc.publicnode.com";
-const HISTORY_KEY = "gigstark.mainnet-payment-hashes.v1";
-const VERIFIED_HISTORY_KEY = "gigstark.mainnet-payment-verified-hashes.v1";
+const HISTORY_KEY = "zeerostream.mainnet-payment-hashes.v1";
+const VERIFIED_HISTORY_KEY = "zeerostream.mainnet-payment-verified-hashes.v1";
+const MEMO_RECEIPTS_KEY = "zeerostream.payment-memo-receipts.v1";
+const DEMO_RECEIPTS = [
+  { step: "1", role: "Creator shield", detail: "Creator registration and public pool-entry receipt.", hash: "0x016301b81ab2fce40fd224140a592a7c23d408ea2f3eb893196c7e4d337f3217" },
+  { step: "2", role: "Client shield", detail: "Client pool-entry receipt before the private payment.", hash: "0x03334787479e79a867e85c7427699a7ad3530934800c11c4ed5b0fc431b59f29" },
+  { step: "3", role: "Private payment", detail: "Successful pool payment receipt; recipient and amount remain private in the pool.", hash: "0x7f11f4e677a5d6d9cf939d652f5c471e081742bc6aec152491dc56e8757aca0" },
+] as const;
 type Phase = "disconnected" | "connected" | "preparing" | "prepared" | "submitting" | "submitted" | "confirmed" | "blocked";
+
+function shortHash(value: string): string {
+  return `${value.slice(0, 10)}…${value.slice(-8)}`;
+}
 
 export function PrivatePaymentMvp() {
   const storeRef = useRef<Store | null>(null);
@@ -46,6 +71,14 @@ export function PrivatePaymentMvp() {
   const [hash, setHash] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [verifiedHistory, setVerifiedHistory] = useState<string[]>([]);
+  const [memoClient, setMemoClient] = useState<MessagingIdentity | null>(null);
+  const [memoCreator, setMemoCreator] = useState<MessagingIdentity | null>(null);
+  const [memoText, setMemoText] = useState("");
+  const [pendingMemo, setPendingMemo] = useState<PendingPaymentMemo | null>(null);
+  const [memoReceipts, setMemoReceipts] = useState<PaymentMemoReceipt[]>([]);
+  const [memoImport, setMemoImport] = useState("");
+  const [decryptedMemo, setDecryptedMemo] = useState("");
+  const [memoNotice, setMemoNotice] = useState("Optional memo receipts are encrypted locally and stored only as ciphertext.");
 
   useEffect(() => {
     const store = createStore({ eip1193Adapters: [] });
@@ -55,6 +88,7 @@ export function PrivatePaymentMvp() {
     const unsubscribe = store.subscribe(update);
     setHistory(parseTransactionHistory(localStorage.getItem(HISTORY_KEY)));
     setVerifiedHistory(parseTransactionHistory(localStorage.getItem(VERIFIED_HISTORY_KEY)));
+    setMemoReceipts(parsePaymentMemoReceiptHistory(localStorage.getItem(MEMO_RECEIPTS_KEY)));
     return () => { unsubscribe(); storeRef.current = null; };
   }, []);
 
@@ -67,8 +101,21 @@ export function PrivatePaymentMvp() {
   }, [account]);
 
   function resetPreparation() {
-    setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setResolvedRecipient("");
+    setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setResolvedRecipient(""); setPendingMemo(null);
     if (account) setPhase("connected");
+  }
+
+  async function createMemoKeys() {
+    try {
+      const [client, creator] = await Promise.all([
+        createMessagingIdentity("client memo key"),
+        createMessagingIdentity("creator inbox key"),
+      ]);
+      setMemoClient(client); setMemoCreator(creator); setPendingMemo(null); setDecryptedMemo("");
+      setMemoNotice("Session-only memo keys created. The creator private key cannot be exported or stored.");
+    } catch (error) {
+      setMemoNotice(error instanceof Error ? error.message : "PAYMENT_MEMO_KEYS_FAILED");
+    }
   }
 
   async function checkWallets() {
@@ -143,17 +190,40 @@ export function PrivatePaymentMvp() {
       const feeResult = await provider.callContract({ contractAddress: STRK20_MAINNET_REVIEW_TARGET.address, entrypoint: "get_fee_amount", calldata: [] });
       setFee(formatStrkAmount(feeResult[0] ?? "0x0"));
       await account.strk20PrepareInvoke(actions, true);
+      let nextPendingMemo: PendingPaymentMemo | null = null;
+      if (operation === "pay" && memoText.trim()) {
+        if (!memoClient || !memoCreator) throw new Error("PAYMENT_MEMO_KEYS_REQUIRED");
+        nextPendingMemo = await encryptPaymentMemo({
+          sender: memoClient,
+          recipient: createPaymentMemoContact(memoCreator),
+          plaintext: memoText,
+          paymentCommitment: await paymentMemoCommitmentForFields({
+            operation,
+            amount,
+            recipient: target ?? "",
+            pool: STRK20_MAINNET_REVIEW_TARGET.address,
+          }),
+        });
+      }
       setResolvedRecipient(target ?? "");
+      setPendingMemo(nextPendingMemo);
       setPrepared(actions); setAcknowledged(false); setRegistrationRequired(false); setPhase("prepared");
-      setMessage("Dry run completed. Review the exact public fields and pool fee before signing.");
+      setMessage(nextPendingMemo
+        ? "Dry run completed and the memo is encrypted locally. Review the fields before signing."
+        : "Dry run completed. Review the exact public fields and pool fee before signing.");
+      setMemoNotice(nextPendingMemo
+        ? "Memo ciphertext is ready. Plaintext will not enter the wallet action, transaction calldata, or receipt storage."
+        : "No memo attached to this prepared action.");
     } catch (error) {
       if (operation === "shield" && isFirstShieldRegistrationRequired(error)) {
         setPrepared(null); setAcknowledged(false); setRegistrationRequired(true); setPhase("blocked");
-        setMessage("Ready X requires its first shield to be registered in the wallet's own Privacy flow. Shield this reviewed amount in Ready X, preserve the pool-deposit hash, then reconnect Gigstark.");
+        setMessage("Ready X requires its first shield to be registered in the wallet's own Privacy flow. Shield this reviewed amount in Ready X, preserve the pool-deposit hash, then reconnect Zeerostream.");
         return;
       }
-      setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setPhase("blocked");
-      setMessage(error instanceof Error ? error.message : "PREPARATION_FAILED");
+      setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setPendingMemo(null); setPhase("blocked");
+      setMessage(error instanceof Error && error.message === "PAYMENT_MEMO_KEYS_REQUIRED"
+        ? "Create session memo keys before preparing a private payment with a memo."
+        : paymentPreparationErrorMessage(error));
     }
   }
 
@@ -166,6 +236,17 @@ export function PrivatePaymentMvp() {
       const result = await account.strk20InvokeTransaction(prepared);
       const nextHistory = updateTransactionHistory(history, result.transaction_hash);
       setHistory(nextHistory); setHash(result.transaction_hash); setPhase("submitted");
+      if (pendingMemo) {
+        try {
+          const memoReceipt = await bindPaymentMemoReceipt({ pending: pendingMemo, paymentHash: result.transaction_hash });
+          const nextMemoReceipts = updatePaymentMemoReceipts(memoReceipts, memoReceipt);
+          setMemoReceipts(nextMemoReceipts); setPendingMemo(null); setMemoText("");
+          localStorage.setItem(MEMO_RECEIPTS_KEY, JSON.stringify(nextMemoReceipts));
+          setMemoNotice("Encrypted memo receipt saved locally beside the payment hash.");
+        } catch (error) {
+          setMemoNotice(error instanceof Error ? error.message : "PAYMENT_MEMO_RECEIPT_FAILED");
+        }
+      }
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(nextHistory));
         setMessage("Submitted. Preserve this hash even if the selected RPC has not indexed it yet.");
@@ -174,6 +255,38 @@ export function PrivatePaymentMvp() {
       }
     } catch (error) {
       setPhase("blocked"); setMessage(walletFlowErrorMessage(error));
+    }
+  }
+
+  async function copyMemoReceipt(receipt: PaymentMemoReceipt) {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(receipt));
+      setMemoNotice("Encrypted memo receipt copied. It contains ciphertext and a payment binding, not plaintext.");
+    } catch {
+      setMemoNotice("Copy was unavailable. Select the memo receipt JSON directly.");
+    }
+  }
+
+  async function importMemoReceipt() {
+    try {
+      const receipt = await parsePaymentMemoReceipt(memoImport);
+      const nextMemoReceipts = updatePaymentMemoReceipts(memoReceipts, receipt);
+      setMemoReceipts(nextMemoReceipts); setMemoImport("");
+      localStorage.setItem(MEMO_RECEIPTS_KEY, JSON.stringify(nextMemoReceipts));
+      setMemoNotice("Encrypted memo receipt imported. Decrypt as the creator to read it locally.");
+    } catch (error) {
+      setMemoNotice(error instanceof Error ? error.message : "PAYMENT_MEMO_IMPORT_FAILED");
+    }
+  }
+
+  async function decryptLatestMemo(receipt = memoReceipts[0]) {
+    if (!receipt || !memoCreator) return;
+    try {
+      setDecryptedMemo(await decryptPaymentMemo(memoCreator, receipt));
+      setMemoNotice("Creator decrypted the memo locally. No wallet key, viewing key, note, proof, or witness was used.");
+    } catch (error) {
+      setDecryptedMemo("");
+      setMemoNotice(error instanceof Error ? error.message : "PAYMENT_MEMO_DECRYPT_FAILED");
     }
   }
 
@@ -199,16 +312,254 @@ export function PrivatePaymentMvp() {
     }
   }
 
-  const actionLabel = operation === "shield" ? "Shield STRK" : operation === "pay" ? "Private creator payment" : "Withdraw STRK";
-  return <section id="pay" className="payment-mvp" aria-labelledby="payment-title">
-    <div className="payment-heading"><div><p className="eyebrow">Live Mainnet MVP</p><h2 id="payment-title">One private payment flow. Three verifiable pool receipts.</h2><p>Wallet connection is the login. A resolved <code>.stark</code> name is a public display and recipient alias—not proof of private-pool identity.</p></div><span className="badge">SN_MAIN · POOL V2</span></div>
-    <ol className="qualifying-route"><li><b>Creator wallet:</b> shield STRK to register and create receipt 1.</li><li><b>Client wallet:</b> shield enough STRK for the payment and create receipt 2.</li><li><b>Client wallet:</b> pay the registered creator privately and create receipt 3.</li></ol>
-    <div className="payment-grid"><article><h3>1 · Connect</h3><button type="button" onClick={checkWallets}>Check compatible wallet</button><p>{walletName || `${wallets.length} installed wallet(s) discovered`}</p><button type="button" className="secondary" onClick={connect} disabled={!walletName || Boolean(account)}>{account ? "Wallet connected" : "Connect on Mainnet"}</button>{account ? <p className="mono">{identity || account.address}<br/><small>{identity ? account.address : "No primary .stark name resolved"}</small></p> : null}</article>
-      <article><h3>2 · Prepare</h3><label>Action<select value={operation} onChange={(event) => { setOperation(event.target.value as PaymentOperation); resetPreparation(); }}><option value="shield">Shield STRK</option><option value="pay">Private creator payment</option><option value="withdraw">Withdraw STRK</option></select></label><label>Amount in STRK<input inputMode="decimal" placeholder="Example: 10" value={amount} onChange={(event) => { setAmount(event.target.value); resetPreparation(); }}/></label>{operation !== "shield" ? <label>{operation === "pay" ? "Creator .stark name or address" : "Public withdrawal address"}<input placeholder="creator.stark or 0x…" value={recipient} onChange={(event) => { setRecipient(event.target.value); resetPreparation(); }}/></label> : <p className="payment-note">Shielding may require a separate ERC-20 approval prompt. The approval does not count as a hackathon pool transaction.</p>}<button type="button" onClick={prepare} disabled={!account || phase === "preparing"}>{phase === "preparing" ? "Preparing…" : "Prepare and dry-run"}</button></article>
-      <article><h3>3 · Review and sign</h3><dl className="review-facts"><div><dt>Network</dt><dd>Starknet Mainnet</dd></div><div><dt>Pool</dt><dd>{STRK20_MAINNET_REVIEW_TARGET.address}</dd></div><div><dt>Action</dt><dd>{actionLabel}</dd></div><div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div><div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>{resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}<div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK (live read)` : "Available after dry run"}</dd></div></dl>{registrationRequired ? <p className="payment-note">First-shield registration: Ready X returned <code>NOT_REGISTERED</code>. Complete this first public shield in Ready X’s own Privacy flow, then reconnect here. Gigstark will not bypass that wallet gate.</p> : null}<label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)}/>I reviewed the Mainnet network, pool, action, token, amount, recipient, and fee.</label><button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase !== "prepared"}>{phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}</button></article></div>
-    <p className="wallet-flow-status" role="status">{message}</p>
-    {hash ? <div className="receipt-card"><b>Latest transaction</b><a href={`https://voyager.online/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a><button type="button" className="secondary" onClick={() => void verifyReceipt()}>Verify receipt and pool event</button></div> : null}
-    {history.length ? <details className="transaction-history" open={verifiedHistory.length >= 3}><summary>Submission evidence · {verifiedHistory.length} verified / {history.length} submitted</summary>{history.map((item) => <div key={item}><a href={`https://voyager.online/tx/${item}`} target="_blank" rel="noreferrer">{item}</a>{verifiedHistory.includes(item) ? <strong className="verified-hash">Verified</strong> : <button type="button" className="secondary" onClick={() => void verifyReceipt(item)}>Verify</button>}</div>)}{verifiedHistory.length >= 3 ? <p className="manifest-hint">Three hashes passed the in-browser receipt check. Add the first three to both <code>strk20.json</code> files, then run the two-provider submission verifier before publishing.</p> : null}</details> : null}
-    <p className="payment-boundary">Signing keys, viewing keys, notes, witnesses, proof generation, and private balances remain inside the wallet. Deposits and withdrawals are public; private transfers hide pool-side sender, recipient, and amount, while timing remains observable.</p>
-  </section>;
+  async function copyCreatorHandoff() {
+    if (!resolvedRecipient) return;
+    try {
+      await navigator.clipboard.writeText(resolvedRecipient);
+      setMessage("Resolved creator recipient copied. Give the client this public address or .stark alias—never a wallet secret.");
+    } catch {
+      setMessage("Copy was unavailable. Select the resolved creator address directly; never share a wallet secret.");
+    }
+  }
+
+  const actionLabel = operation === "shield"
+    ? "Shield STRK"
+    : operation === "pay"
+      ? "Private creator payment"
+      : "Withdraw STRK";
+
+  const walletReady = Boolean(account);
+  const actionReady = Boolean(prepared);
+  const receiptReady = phase === "submitted" || phase === "confirmed";
+
+  return (
+    <section id="pay" className="payment-mvp" aria-labelledby="payment-title">
+      <div className="payment-heading">
+        <div>
+          <p className="eyebrow">Live Mainnet MVP</p>
+          <h2 id="payment-title">One private payment flow. Three verifiable pool receipts.</h2>
+          <p>
+            Wallet connection proves account control. A resolved <code>.stark</code> name is a public
+            recipient alias—not a private-pool identity claim.
+          </p>
+        </div>
+        <span className="badge">SN_MAIN · POOL V2</span>
+      </div>
+
+      <ol className="qualifying-route" aria-label="Qualifying Mainnet transaction route">
+        <li><b>Creator wallet:</b> shield STRK to register and create receipt 1.</li>
+        <li><b>Client wallet:</b> shield enough STRK for the payment and create receipt 2.</li>
+        <li><b>Client wallet:</b> pay the registered creator privately and create receipt 3.</li>
+      </ol>
+
+      <section className="payment-demo-route" aria-labelledby="demo-route-title">
+        <div className="payment-demo-route-heading">
+          <div>
+            <p className="eyebrow">Two-user demo route</p>
+            <h3 id="demo-route-title">Hand off a public recipient. Keep private state in each wallet.</h3>
+          </div>
+          <p>Switch wallets only at the marked handoff. Zeerostream never transfers keys, notes, balances, or proofs between participants.</p>
+        </div>
+
+        <ol className="demo-progress">
+          <li className={walletReady ? "complete" : "active"} aria-current={!walletReady ? "step" : undefined}>
+            <span>1</span><b>Connect</b><small>Check capability and connect the active Mainnet wallet.</small>
+          </li>
+          <li className={actionReady ? "complete" : walletReady ? "active" : ""} aria-current={walletReady && !actionReady ? "step" : undefined}>
+            <span>2</span><b>Prepare</b><small>Resolve public fields, read the fee, and dry-run privately.</small>
+          </li>
+          <li className={receiptReady ? "complete" : actionReady ? "active" : ""} aria-current={actionReady && !receiptReady ? "step" : undefined}>
+            <span>3</span><b>Sign &amp; verify</b><small>Approve in the wallet, then verify the public pool receipt.</small>
+          </li>
+        </ol>
+
+        <div className="participant-handoff">
+          <article>
+            <p className="eyebrow">Creator handoff</p>
+            <h4>Share a recipient, never a secret.</h4>
+            <p>{resolvedRecipient ? "The dry run resolved this public recipient:" : <>After shielding, give the client your public <code>.stark</code> alias or address.</>}</p>
+            {resolvedRecipient ? (
+              <>
+                <code>{resolvedRecipient}</code>
+                <button type="button" className="secondary" onClick={() => void copyCreatorHandoff()}>Copy public recipient</button>
+              </>
+            ) : null}
+          </article>
+          <article>
+            <p className="eyebrow">Client preflight</p>
+            <h4>One exact review before signing.</h4>
+            <dl>
+              <div><dt>Wallet</dt><dd>{account ? "Connected on Mainnet" : "Not connected"}</dd></div>
+              <div><dt>Recipient</dt><dd>{resolvedRecipient || "Resolved during payment dry run"}</dd></div>
+              <div><dt>Notes</dt><dd>Maturity is checked by the wallet; note data stays private.</dd></div>
+              <div><dt>Next</dt><dd>{prepared ? "Review and acknowledge the exact action." : "Prepare an exact action."}</dd></div>
+            </dl>
+          </article>
+        </div>
+      </section>
+
+      <div className="payment-grid">
+        <article className={walletReady ? "flow-card complete" : "flow-card active"}>
+          <p className="flow-card-kicker">Step 01</p>
+          <h3>Connect safely</h3>
+          <p>Capability checks do not request private balances or note data.</p>
+          <button type="button" onClick={checkWallets}>Check compatible wallet</button>
+          <p>{walletName || `${wallets.length} installed wallet(s) discovered`}</p>
+          <button type="button" className="secondary" onClick={connect} disabled={!walletName || Boolean(account)}>
+            {account ? "Wallet connected" : "Connect on Mainnet"}
+          </button>
+          {account ? <p className="mono account-identity">{identity || account.address}<br /><small>{identity ? account.address : "No primary .stark name resolved"}</small></p> : null}
+        </article>
+
+        <article className={`flow-card ${actionReady ? "complete" : walletReady ? "active" : ""}`}>
+          <p className="flow-card-kicker">Step 02</p>
+          <h3>Prepare privately</h3>
+          <label>
+            Action
+            <select value={operation} onChange={(event) => { setOperation(event.target.value as PaymentOperation); resetPreparation(); }}>
+              <option value="shield">Shield STRK · public deposit</option>
+              <option value="pay">Pay creator · private transfer</option>
+              <option value="withdraw">Withdraw STRK · public exit</option>
+            </select>
+          </label>
+          <label>
+            Amount in STRK
+            <input inputMode="decimal" autoComplete="off" placeholder="Example: 10" value={amount} onChange={(event) => { setAmount(event.target.value); resetPreparation(); }} />
+          </label>
+          {operation !== "shield" ? (
+            <label>
+              {operation === "pay" ? "Creator .stark name or address" : "Public withdrawal address"}
+              <input autoComplete="off" spellCheck={false} placeholder="creator.stark or 0x…" value={recipient} onChange={(event) => { setRecipient(event.target.value); resetPreparation(); }} />
+            </label>
+          ) : (
+            <p className="payment-note">Your wallet may ask twice: first for ERC-20 approval, then for the pool deposit. Only the pool deposit is qualifying evidence.</p>
+          )}
+          {operation === "pay" ? (
+            <label>
+              Private memo receipt
+              <textarea
+                rows={3}
+                maxLength={280}
+                placeholder="Optional encrypted memo for the creator"
+                value={memoText}
+                onChange={(event) => { setMemoText(event.target.value); resetPreparation(); }}
+              />
+            </label>
+          ) : null}
+          <button type="button" onClick={prepare} disabled={!account || phase === "preparing"}>
+            {phase === "preparing" ? "Preparing…" : "Prepare and dry-run"}
+          </button>
+        </article>
+
+        <article className={`flow-card ${receiptReady ? "complete" : actionReady ? "active" : ""}`}>
+          <p className="flow-card-kicker">Step 03</p>
+          <h3>Review and sign</h3>
+          <dl className="review-facts">
+            <div><dt>Network</dt><dd>Starknet Mainnet</dd></div>
+            <div><dt>Pool</dt><dd>{STRK20_MAINNET_REVIEW_TARGET.address}</dd></div>
+            <div><dt>Action</dt><dd>{actionLabel}</dd></div>
+            <div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div>
+            <div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>
+            {resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}
+            <div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK · live read` : "Available after dry run"}</dd></div>
+          </dl>
+          {registrationRequired ? <p className="payment-note">Ready X requires first-shield registration in its own Privacy flow. Complete that public shield there, preserve the deposit hash, then reconnect here.</p> : null}
+          <label className="review-acknowledgement">
+            <input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)} />
+            <span>I reviewed the network, pool, action, token, amount, recipient, and live fee.</span>
+          </label>
+          <button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase !== "prepared"}>
+            {phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}
+          </button>
+        </article>
+      </div>
+
+      <p className="wallet-flow-status" role="status" aria-live="polite"><span className="status-dot" aria-hidden="true" />{message}</p>
+
+      {hash ? (
+        <div className="receipt-card">
+          <b>Latest transaction</b>
+          <a href={`https://voyager.online/tx/${hash}`} target="_blank" rel="noreferrer" aria-label={`View transaction ${hash} on Voyager`}>{shortHash(hash)}</a>
+          <button type="button" className="secondary" onClick={() => void verifyReceipt()}>Verify receipt and pool event</button>
+        </div>
+      ) : null}
+
+      {history.length ? (
+        <details className="transaction-history" open={verifiedHistory.length >= 3}>
+          <summary>Submission evidence · {verifiedHistory.length} verified / {history.length} submitted</summary>
+          {history.map((item) => (
+            <div key={item}>
+              <a href={`https://voyager.online/tx/${item}`} target="_blank" rel="noreferrer" aria-label={`View transaction ${item} on Voyager`}>{shortHash(item)}</a>
+              {verifiedHistory.includes(item)
+                ? <strong className="verified-hash">Verified</strong>
+                : <button type="button" className="secondary" onClick={() => void verifyReceipt(item)}>Verify</button>}
+            </div>
+          ))}
+        </details>
+      ) : null}
+
+      <section className="memo-receipts" aria-labelledby="memo-receipts-title">
+        <div>
+          <p className="eyebrow">Encrypted memo receipt</p>
+          <h3 id="memo-receipts-title">Attach a private note without changing the pool transaction.</h3>
+          <p>The memo is encrypted before signing and bound to the returned payment hash after submission. The stored receipt contains ciphertext, a commitment, a replay nullifier, and a local recipient label.</p>
+        </div>
+        <div className="memo-tools">
+          <article>
+            <h4>Demo keys</h4>
+            <p>Session-only keys model creator import/decrypt. They are not wallet viewing keys.</p>
+            <button type="button" className="secondary" onClick={() => void createMemoKeys()}>{memoCreator ? "Rotate memo keys" : "Create memo keys"}</button>
+            {memoCreator ? <code>creator key {memoCreator.keyId}</code> : null}
+            {pendingMemo ? <strong className="verified-hash">Memo encrypted before signature</strong> : null}
+          </article>
+          <article>
+            <h4>Creator inbox demo</h4>
+            <textarea rows={4} value={memoImport} onChange={(event) => setMemoImport(event.target.value)} placeholder="Paste encrypted memo receipt JSON" />
+            <div className="memo-actions">
+              <button type="button" className="secondary" onClick={() => void importMemoReceipt()} disabled={!memoImport.trim()}>Import receipt</button>
+              <button type="button" className="secondary" onClick={() => void decryptLatestMemo()} disabled={!memoCreator || memoReceipts.length === 0}>Decrypt latest</button>
+            </div>
+            <p role="status">{memoNotice}</p>
+            {decryptedMemo ? <p className="memo-plaintext"><b>Creator local view:</b> {decryptedMemo}</p> : null}
+          </article>
+        </div>
+        {memoReceipts.length ? (
+          <details className="transaction-history">
+            <summary>Local memo receipts · {memoReceipts.length}</summary>
+            {memoReceipts.map((receipt) => (
+              <div key={`${receipt.paymentHash}:${receipt.memoCommitment}`}>
+                <span><b>{receipt.recipientLabel}</b> · {shortHash(receipt.paymentHash)} · memo {receipt.memoCommitment.slice(0, 16)}…</span>
+                <button type="button" className="secondary" onClick={() => void copyMemoReceipt(receipt)}>Copy receipt</button>
+              </div>
+            ))}
+          </details>
+        ) : null}
+      </section>
+
+      <section id="evidence" className="receipt-timeline" aria-labelledby="receipt-timeline-title">
+        <div>
+          <p className="eyebrow">Verified Mainnet evidence</p>
+          <h3 id="receipt-timeline-title">Three public receipts. One private payment relationship.</h3>
+          <p>Each committed hash was checked through two independent RPC providers for accepted finality, successful execution, and a reviewed-pool event.</p>
+          <span className="evidence-seal"><b>3 / 3</b> receipts verified</span>
+        </div>
+        <ol>
+          {DEMO_RECEIPTS.map((receipt) => (
+            <li key={receipt.hash}>
+              <span>{receipt.step}</span>
+              <div>
+                <b>{receipt.role}</b>
+                <small>{receipt.detail}</small>
+                <a href={`https://voyager.online/tx/${receipt.hash}`} target="_blank" rel="noreferrer" aria-label={`View ${receipt.role} transaction ${receipt.hash} on Voyager`}>
+                  View on Voyager <code>{shortHash(receipt.hash)}</code>
+                </a>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <p className="payment-boundary"><b>Wallet-only boundary:</b> signing keys, viewing keys, notes, witnesses, proofs, and private balances never enter Zeerostream. Deposits and withdrawals are public; private transfers hide pool-side sender, recipient, and amount, while timing remains observable.</p>
+    </section>
+  );
 }

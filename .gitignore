@@ -10,6 +10,9 @@ release/gigstark-mainnet-deployment-inputs.local.json
 .codex/
 CHAT*.md
 CONVERSATION*.md
+chat*.md
+conversation*.md
+transcript*.md
 *.session
 *.log
 *.tsbuildinfo

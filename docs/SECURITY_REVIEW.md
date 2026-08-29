@@ -1,4 +1,4 @@
-# Gigstark internal security review
+# Zeerostream internal security review
 
 Last reviewed: 2026-08-25
 

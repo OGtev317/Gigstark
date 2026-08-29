@@ -1,8 +1,8 @@
-# Gigstark three-minute demo script
+# Zeerostream three-minute demo script
 
 ## 0:00-0:25 — problem and promise
 
-"Freelance payments expose who paid whom and how much. Gigstark is a
+"Freelance payments expose who paid whom and how much. Zeerostream is a
 non-custodial STRK20 interface that lets a client shield STRK and pay a
 registered creator privately on Starknet Mainnet."
 
@@ -12,7 +12,7 @@ Show the live URL and the `PRIVATE SPRINT MVP` badge.
 
 Show **Check compatible wallet**. Explain that capability detection checks only
 Wallet API versions. Wallet connection is the login; `.stark` names are public
-aliases. Gigstark never receives signing keys, viewing keys, private notes,
+aliases. Zeerostream never receives signing keys, viewing keys, private notes,
 witnesses, proofs, or private balances.
 
 ## 0:55-1:35 — creator and client shields

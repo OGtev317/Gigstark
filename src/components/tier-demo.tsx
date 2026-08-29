@@ -5,7 +5,7 @@ import { createTierPolicy, createTierVerifier, verifyTierProof } from "../lib/ti
 import styles from "./tier-demo.module.css";
 
 const now = 1_800_000_000;
-const policy = createTierPolicy({ id: "gigstark:creator-access:v1", audience: "gigstark-creator-feed", tier: "studio", validFrom: now - 60, validUntil: now + 3600, requiresNullifier: true });
+const policy = createTierPolicy({ id: "gigstark:creator-access:v1", audience: "zeerostream-creator-feed", tier: "studio", validFrom: now - 60, validUntil: now + 3600, requiresNullifier: true });
 
 export function TierDemo() {
   const [verifier] = useState(createTierVerifier);

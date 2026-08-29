@@ -1,8 +1,8 @@
-# Gigstark architecture and integration boundary
+# Zeerostream architecture and integration boundary
 
 ## Scope
 
-Gigstark is a Starknet/STRK20 project. It does not use, call, deploy to, or anchor anything on Athera L1 or L3. The receipt-anchor idea is intentionally deferred; it must not become a pretext for storing identities, amounts, delivery content, or evidence on another chain.
+Zeerostream is a Starknet/STRK20 project. It does not use, call, deploy to, or anchor anything on Athera L1 or L3. The receipt-anchor idea is intentionally deferred; it must not become a pretext for storing identities, amounts, delivery content, or evidence on another chain.
 
 ## Strategic center: ZK settlement plus an Oyster receipt
 
@@ -117,11 +117,11 @@ access scope, audience, expiry, credential class, and one scoped nullifier.
 
 ## Passport patterns adapted locally
 
-Gigstark borrows protocol patterns—not code, deployed contracts, trust, or network state—from the Athera Passport selective-disclosure design:
+Zeerostream borrows protocol patterns—not code, deployed contracts, trust, or network state—from the Athera Passport selective-disclosure design:
 
 - a bounded, revocable policy for a specific audience and tier;
 - a receipt bound to that policy, audience, and an expiration time;
-- one anti-replay value scoped to the Gigstark policy; and
+- one anti-replay value scoped to the Zeerostream policy; and
 - proof/disclosure digests rather than private witnesses or user identity data.
 
 The earlier TypeScript checker remains a browser simulation. The Cairo
@@ -130,10 +130,10 @@ a policy-pinned Stark attestor key and canonical signatures. It verifies an
 attested acceptance receipt, not the underlying ZK proof. Issuance, off-chain
 proof verification, attestor governance, and an independent audit remain open.
 
-## GigstarkPassport
+## ZeerostreamPassport
 
 `contracts/src/gigstark_passport.cairo` is a separately written Gigstark
-proof-receipt verifier. It binds an opaque proof commitment to a Gigstark-only
+proof-receipt verifier. It binds an opaque proof commitment to a Zeerostream-only
 policy, credential class, purpose, audience contract, chain, verifier, exact
 action statement, unlinkable role/viewer commitment, validity window, and
 scope-specific nullifier. It stores no identity, wallet address, witness,
@@ -145,7 +145,7 @@ disclosure, audience-binding, expiry, revocation, and anti-replay patterns. The
 future ZK issuer/verifier boundary requires a Starknet-specific design, audit,
 and testnet-only review.
 
-## GigstarkComputeVerifier
+## ZeerostreamComputeVerifier
 
 `contracts/src/compute_verifier.cairo` is a clean-room, Starknet-native direct
 Groth16 settlement verifier. A policy pins the audience contract, program
@@ -177,7 +177,7 @@ Before release, the project must still specify:
 
 ## Sources reviewed
 
-- The STRK20 privacy repository documents the pool, helper/anonymizer model, and a compatibility matrix. Its published privacy-pool and Ekubo/Vesu helper class hashes are references, not Gigstark deployment approvals.
+- The STRK20 privacy repository documents the pool, helper/anonymizer model, and a compatibility matrix. Its published privacy-pool and Ekubo/Vesu helper class hashes are references, not Zeerostream deployment approvals.
 - The STRK20 Wallet API route keeps viewing keys, note discovery, proof generation, and submission inside the privacy-enabled user wallet. It requires explicit capability detection and uses an open-note-plus-invoke flow for helper interactions.
 - Oyster documents a native Apple Silicon CLI and independent attestation
   verification against image ID, AWS Nitro root, recency, and exact user data:
@@ -185,7 +185,7 @@ Before release, the project must still specify:
   <https://docs.marlin.org/oyster/build-cvm/guides/verify-attestations-oyster-cvm>.
 - Starknet documents both Cairo/STARK provable computation through SHARP and
   SNARK verification in Cairo contracts. These establish feasible proof paths,
-  not an audit or approval of Gigstark's future circuit:
+  not an audit or approval of Zeerostream's future circuit:
   <https://docs.starknet.io/learn/protocol/sharp> and
   <https://docs.starknet.io/build/starknet-by-example/advanced/verify-proofs>.
 

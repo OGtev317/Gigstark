@@ -1,16 +1,17 @@
-# Gigstark
+# Zeerostream
 
-Gigstark is a non-custodial STRK20 interface for private creator payments on
+Zeerostream is a non-custodial STRK20 interface for private creator payments on
 Starknet Mainnet. A client can shield STRK, pay a registered creator inside the
 privacy pool, and withdraw. The connected wallet keeps every signing key,
-viewing key, private note, and witness. Gigstark sends only the requested public
+viewing key, private note, and witness. Zeerostream sends only the requested public
 action fields, does not inspect or persist dry-run proof output, and retains only
 public transaction hashes for recovery.
 
 Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
 
 Operator guides: [Mainnet payment runbook](docs/MAINNET_PAYMENT_RUNBOOK.md) ·
-[three-minute demo script](docs/DEMO_SCRIPT.md)
+[three-minute demo script](docs/DEMO_SCRIPT.md) ·
+[private messaging and subscription plan](docs/PRIVATE_MESSAGING_SUBSCRIPTION_PLAN.md)
 
 ## Competition MVP
 
@@ -42,6 +43,11 @@ custom-ZK, encrypted-messaging, and Oyster/TEE work, but none of it is part of
 the competition MVP or advertised as live. Custom contracts remain deployment-
 gated pending independent review and production governance inputs.
 
+The next product wedge is encrypted payment memos and private pool-participant
+mail, followed by escrow negotiation and prepaid subscriptions. The staged
+helper, indexer, SDK, wallet, and audit gates are captured in
+[the private messaging and subscription plan](docs/PRIVATE_MESSAGING_SUBSCRIPTION_PLAN.md).
+
 No Oyster job has been deployed. A future live TEE claim requires a reproducible
 immutable workload image, matching image ID, a real Oyster job, raw Nitro
 attestation verification including the AWS root and certificate chain,
@@ -49,7 +55,7 @@ measurements, freshness, and workload-bound `user_data`. Any TEE result remains
 optional and non-authoritative for settlement.
 
 The hosted Starknet ID API is not an authentication service and is not required
-by Gigstark. The wallet proves account control by approving the connection and
+by Zeerostream. The wallet proves account control by approving the connection and
 signs every transaction itself.
 
 ## Run locally
@@ -112,7 +118,7 @@ source-reproduced V2 pool but deliberately leaves every constructor argument
 unset and unreviewed.
 
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
-Track implementation status and release gates in the dedicated [Gigstark roadmap](ROADMAP.md).
+Track implementation status and release gates in the dedicated [Zeerostream roadmap](ROADMAP.md).
 Review the [compute specimen](compute/README.md) and its explicit hardware and
 test-ceremony boundaries before treating it as deployable.
 Review the explicit trust assumptions and blockers in the

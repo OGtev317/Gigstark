@@ -1,4 +1,4 @@
-# Gigstark Mainnet payment runbook
+# Zeerostream Mainnet payment runbook
 
 This runbook completes the three wallet-signed STRK20 transactions required for
 the Private Sprint. It never asks an operator to export a private key, viewing
@@ -26,18 +26,18 @@ key, seed phrase, note, or proof witness.
    amount. This pool transaction registers the creator when needed and counts
    as the first competition receipt.
 2. Run **Prepare and dry-run**.
-3. If the wallet returns `NOT_REGISTERED` during this first simulation, Gigstark
+3. If the wallet returns `NOT_REGISTERED` during this first simulation, Zeerostream
    stops before submission. Complete the first public shield in Ready X's own
-   Privacy flow, preserve the pool-deposit hash, and reconnect Gigstark after
-   the receipt is accepted. Gigstark does not bypass the wallet registration gate.
+   Privacy flow, preserve the pool-deposit hash, and reconnect Zeerostream after
+   the receipt is accepted. Zeerostream does not bypass the wallet registration gate.
 4. For already registered wallets, request the Mainnet signature. The wallet may first request an ERC-20
    approval and then the pool deposit. The approval does not qualify; preserve
-   the pool-deposit hash returned by Gigstark.
+   the pool-deposit hash returned by Zeerostream.
 5. Use **Verify receipt and pool event**. Preserve the green **Verified** hash.
 
 ## Transaction 2: client shield
 
-1. Switch to the client wallet and reconnect Gigstark.
+1. Switch to the client wallet and reconnect Zeerostream.
 2. Choose **Shield STRK** and enter enough to cover the intended creator
    payment and later pool fee.
 3. Dry-run, review, acknowledge, and sign. Preserve the pool-deposit hash rather
@@ -53,7 +53,7 @@ key, seed phrase, note, or proof witness.
 3. Dry-run, review the resolved address and live fee, acknowledge, and sign.
 4. Preserve the relayed transaction hash. Do not infer the payer from the
    transaction sender; private submissions use a relayer.
-5. Verify the successful receipt and pool event in Gigstark.
+5. Verify the successful receipt and pool event in Zeerostream.
 
 The site's **Submission evidence** panel keeps submitted and verified hashes
 separate. A green **Verified** label means that the configured Mainnet RPC saw

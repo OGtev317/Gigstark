@@ -1,8 +1,8 @@
-# Gigstark roadmap
+# Zeerostream roadmap
 
 Last reviewed: 2026-08-26
 
-Gigstark is a standalone Starknet and STRK20 project centered on encrypted
+Zeerostream is a standalone Starknet and STRK20 project centered on encrypted
 creator-member messaging plus private subscriptions and creator monetization.
 Private freelance milestones and proof-gated access support those two product
 pillars. Its strategic center
@@ -30,7 +30,7 @@ and a privacy-enabled user wallet:
 
 1. A creator publishes a paid offering, a bounded subscription tier, and an
    encrypted member inbox.
-2. A member connects a privacy-enabled wallet; Gigstark verifies the advertised
+2. A member connects a privacy-enabled wallet; Zeerostream verifies the advertised
    Wallet API version and exact Starknet network without reading private
    balances or note state.
 3. The member explicitly pays for one subscription period through STRK20. No
@@ -64,7 +64,7 @@ definition of done by themselves.
 
 **Status: Complete**
 
-- Keep Gigstark isolated from Athera repositories, contracts, and networks.
+- Keep Zeerostream isolated from Athera repositories, contracts, and networks.
 - Keep identity documents, viewing keys, spending keys, private witnesses,
   delivery contents, and dispute evidence out of the repository and browser.
 - State accurately that helper amounts and timing can remain observable.
@@ -397,7 +397,7 @@ the only planned recurring-payment mechanism before that review.
 - No Mainnet deployment or production fund movement is implied by a local
   build, test, review manifest, or read-only health result.
 - No Athera L1/L3 contract, receipt anchor, registry edit, or cross-chain trust
-  dependency is part of the current Gigstark release path.
+  dependency is part of the current Zeerostream release path.
 - No identity or evidence content is placed in public contract state. Helper
   token and amount are public settlement fields.
 - No claim is made that STRK20 helper amounts or timing are cryptographically
@@ -410,5 +410,8 @@ the only planned recurring-payment mechanism before that review.
 
 See [the architecture boundary](docs/ARCHITECTURE.md) and
 [the STRK20 Sepolia integration pin](contracts/STRK20_SEPOLIA_PIN.md) for the
-supporting design constraints. The current app-team findings and unresolved
-deployment blockers are tracked in [the internal security review](docs/SECURITY_REVIEW.md).
+supporting design constraints. The focused build path for encrypted payment
+memos, private mail, escrow negotiation, and prepaid subscriptions is tracked
+in [the private messaging and subscription plan](docs/PRIVATE_MESSAGING_SUBSCRIPTION_PLAN.md).
+The current app-team findings and unresolved deployment blockers are tracked in
+[the internal security review](docs/SECURITY_REVIEW.md).

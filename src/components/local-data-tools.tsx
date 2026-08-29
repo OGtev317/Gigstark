@@ -4,8 +4,8 @@ import { useRef, useState } from "react";
 import { createLocalWorkspaceBackup, decodeMarketplace, parseLocalWorkspaceBackup } from "../lib/local-workspace-backup";
 import type { Subscription } from "../lib/subscription";
 
-const MARKETPLACE_KEY = "gigstark.marketplace.v1";
-const SUBSCRIPTIONS_KEY = "gigstark.subscription-plans.v1";
+const MARKETPLACE_KEY = "zeerostream.marketplace.v1";
+const SUBSCRIPTIONS_KEY = "zeerostream.subscription-plans.v1";
 
 function subscriptionsFromStorage(value: string | null): Subscription[] {
   if (!value) return [];
@@ -22,7 +22,7 @@ export function LocalDataTools() {
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
-      anchor.href = url; anchor.download = "gigstark-local-workspace-v1.json"; anchor.click(); URL.revokeObjectURL(url);
+      anchor.href = url; anchor.download = "zeerostream-local-workspace-v1.json"; anchor.click(); URL.revokeObjectURL(url);
       setNotice("Local backup downloaded. It is not a payment receipt, public listing export, or wallet backup.");
     } catch { setNotice("No valid local workspace exists to export yet."); }
   }
@@ -37,12 +37,12 @@ export function LocalDataTools() {
     } catch (error) { setNotice(error instanceof Error ? error.message : "LOCAL_BACKUP_IMPORT_FAILED"); }
   }
   function resetWorkspace() {
-    if (!window.confirm("Delete only this browser's Gigstark local marketplace and subscription records? This cannot be recovered unless you exported a backup.")) return;
+    if (!window.confirm("Delete only this browser's Zeerostream local marketplace and subscription records? This cannot be recovered unless you exported a backup.")) return;
     localStorage.removeItem(MARKETPLACE_KEY); localStorage.removeItem(SUBSCRIPTIONS_KEY);
     window.location.reload();
   }
   return <section className="local-data-tools" aria-labelledby="local-data-title">
-    <div><p className="eyebrow">Local data controls</p><h2 id="local-data-title">Portable, not public.</h2><p>Move validated sample records between browsers with an explicit JSON file. Import replaces only this browser’s Gigstark product records.</p></div>
+    <div><p className="eyebrow">Local data controls</p><h2 id="local-data-title">Portable, not public.</h2><p>Move validated sample records between browsers with an explicit JSON file. Import replaces only this browser’s Zeerostream product records.</p></div>
     <div className="order-actions"><button onClick={exportBackup}>Export local records</button><button className="secondary" onClick={() => inputRef.current?.click()}>Import local records</button><button className="secondary" onClick={resetWorkspace}>Reset this browser</button><input ref={inputRef} type="file" accept="application/json,.json" onChange={(event) => void importBackup(event.target.files?.[0])} hidden /></div>
     <p className="notice" role="status">{notice}</p>
   </section>;
