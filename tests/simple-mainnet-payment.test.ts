@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { STRK20_MAINNET_REVIEW_TARGET } from "../src/lib/strk20-wallet";
-import { buildSimplePaymentActions, formatStrkAmount, parseStrkAmount, parseTransactionHistory, receiptQualifiesForSubmission, receiptTouchesPool, updateTransactionHistory } from "../src/lib/simple-mainnet-payment";
+import { buildSimplePaymentActions, formatStrkAmount, isFirstShieldRegistrationRequired, parseStrkAmount, parseTransactionHistory, receiptQualifiesForSubmission, receiptTouchesPool, updateTransactionHistory } from "../src/lib/simple-mainnet-payment";
 
 test("parses exact STRK amounts without floating point", () => {
   assert.equal(parseStrkAmount("1"), "0xde0b6b3a7640000");
@@ -18,6 +18,14 @@ test("builds only the three pool-native MVP actions", () => {
   });
   assert.equal(buildSimplePaymentActions("withdraw", "2", "0x123")[0]?.type, "withdraw");
   assert.throws(() => buildSimplePaymentActions("pay", "1"), /RECIPIENT_REQUIRED/);
+});
+
+test("only recognizes the wallet's exact first-shield registration signal", () => {
+  assert.equal(isFirstShieldRegistrationRequired(new Error("NOT_REGISTERED")), true);
+  assert.equal(isFirstShieldRegistrationRequired({ message: "NOT_REGISTERED" }), true);
+  assert.equal(isFirstShieldRegistrationRequired(new Error("An error occurred (NOT_REGISTERED)")), true);
+  assert.equal(isFirstShieldRegistrationRequired(new Error("NOT_REGISTERED_EXTRA")), false);
+  assert.equal(isFirstShieldRegistrationRequired("NOT_REGISTERED"), false);
 });
 
 test("qualifying receipt must succeed and contain a pool-originated event", () => {

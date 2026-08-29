@@ -26,8 +26,11 @@ key, seed phrase, note, or proof witness.
    amount. This pool transaction registers the creator when needed and counts
    as the first competition receipt.
 2. Run **Prepare and dry-run**.
-3. Review network, pool, token, amount, and live fee; acknowledge them.
-4. Request the Mainnet signature. The wallet may first request an ERC-20
+3. If the wallet returns `NOT_REGISTERED` during this first simulation, Gigstark
+   stops before submission. Complete the first public shield in Ready X's own
+   Privacy flow, preserve the pool-deposit hash, and reconnect Gigstark after
+   the receipt is accepted. Gigstark does not bypass the wallet registration gate.
+4. For already registered wallets, request the Mainnet signature. The wallet may first request an ERC-20
    approval and then the pool deposit. The approval does not qualify; preserve
    the pool-deposit hash returned by Gigstark.
 5. Use **Verify receipt and pool event**. Preserve the green **Verified** hash.

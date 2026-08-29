@@ -5,6 +5,20 @@ export const STRK_MAINNET_TOKEN =
 
 export type PaymentOperation = "shield" | "pay" | "withdraw";
 
+/**
+ * A privacy wallet can require its first pool deposit to register the sender.
+ * Registration changes pool state, so a simulated invoke may return this exact
+ * error even though the subsequent wallet-controlled deposit is valid.
+ */
+export function isFirstShieldRegistrationRequired(error: unknown): boolean {
+  const message = error instanceof Error
+    ? error.message
+    : error && typeof error === "object" && "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+  return /(?:^|[\s(])NOT_REGISTERED(?:\)|\s|$)/.test(message.trim());
+}
+
 export function parseStrkAmount(value: string): string {
   const normalized = value.trim();
   if (!/^(?:0|[1-9]\d*)(?:\.\d{1,18})?$/.test(normalized)) {

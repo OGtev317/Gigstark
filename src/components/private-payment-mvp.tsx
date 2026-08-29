@@ -15,6 +15,7 @@ import {
   STRK_MAINNET_TOKEN,
   buildSimplePaymentActions,
   formatStrkAmount,
+  isFirstShieldRegistrationRequired,
   parseTransactionHistory,
   receiptQualifiesForSubmission,
   updateTransactionHistory,
@@ -39,6 +40,7 @@ export function PrivatePaymentMvp() {
   const [fee, setFee] = useState("");
   const [prepared, setPrepared] = useState<STRK20_ACTION[] | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
+  const [registrationRequired, setRegistrationRequired] = useState(false);
   const [phase, setPhase] = useState<Phase>("disconnected");
   const [message, setMessage] = useState("Check a wallet, connect on Mainnet, then prepare one exact action.");
   const [hash, setHash] = useState("");
@@ -59,13 +61,13 @@ export function PrivatePaymentMvp() {
   useEffect(() => {
     if (!account) return;
     return account.onChange(() => {
-      setAccount(null); setIdentity(""); setFee(""); setPrepared(null); setAcknowledged(false); setPhase("disconnected");
+      setAccount(null); setIdentity(""); setFee(""); setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setPhase("disconnected");
       setMessage("The wallet account or network changed. Reconnect and prepare again.");
     });
   }, [account]);
 
   function resetPreparation() {
-    setPrepared(null); setAcknowledged(false); setResolvedRecipient("");
+    setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setResolvedRecipient("");
     if (account) setPhase("connected");
   }
 
@@ -90,22 +92,31 @@ export function PrivatePaymentMvp() {
     const wallet = wallets.find((candidate) => candidate.name === walletName);
     if (!wallet) return;
     setMessage("Waiting for Mainnet wallet connection approval…");
+    let stage = "wallet connection";
     try {
       const capability = await detectStrk20WalletApi(wallet);
       if (!capability.supported) throw new Error("WALLET_API_UNSUPPORTED");
       const connection = await wallet.features["standard:connect"].connect();
+      stage = "connected account";
       const connected = requireMainnetWalletAccount(connection.accounts);
+      stage = "wallet network";
       requireMainnetWalletChain(String(await walletV6.requestChainId(wallet)));
       const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
       const nextAccount = new WalletAccountV6({ provider, walletProvider: wallet, address: connected.address });
+      stage = "reviewed Mainnet pool";
       await verifyReviewedPoolTarget(provider, STRK20_MAINNET_REVIEW_TARGET);
+      stage = "live pool fee";
       const feeResult = await provider.callContract({ contractAddress: STRK20_MAINNET_REVIEW_TARGET.address, entrypoint: "get_fee_amount", calldata: [] });
       setFee(formatStrkAmount(feeResult[0] ?? "0x0"));
       setAccount(nextAccount); setPhase("connected");
       try { setIdentity(await provider.getStarkName(connected.address)); } catch { setIdentity(""); }
       setMessage("Connected to the reviewed Mainnet pool. No balance or private note was requested.");
     } catch (error) {
-      setAccount(null); setFee(""); setPhase("blocked"); setMessage(walletFlowErrorMessage(error));
+      const detail = walletFlowErrorMessage(error);
+      setAccount(null); setFee(""); setPhase("blocked");
+      setMessage(detail === "The wallet flow could not continue. Nothing was submitted."
+        ? `Connection stopped while checking ${stage}. Nothing was submitted.`
+        : detail);
     }
   }
 
@@ -133,16 +144,21 @@ export function PrivatePaymentMvp() {
       setFee(formatStrkAmount(feeResult[0] ?? "0x0"));
       await account.strk20PrepareInvoke(actions, true);
       setResolvedRecipient(target ?? "");
-      setPrepared(actions); setAcknowledged(false); setPhase("prepared");
+      setPrepared(actions); setAcknowledged(false); setRegistrationRequired(false); setPhase("prepared");
       setMessage("Dry run completed. Review the exact public fields and pool fee before signing.");
     } catch (error) {
-      setPrepared(null); setAcknowledged(false); setPhase("blocked");
+      if (operation === "shield" && isFirstShieldRegistrationRequired(error)) {
+        setPrepared(null); setAcknowledged(false); setRegistrationRequired(true); setPhase("blocked");
+        setMessage("Ready X requires its first shield to be registered in the wallet's own Privacy flow. Shield this reviewed amount in Ready X, preserve the pool-deposit hash, then reconnect Gigstark.");
+        return;
+      }
+      setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setPhase("blocked");
       setMessage(error instanceof Error ? error.message : "PREPARATION_FAILED");
     }
   }
 
   async function submit() {
-    if (!account || !prepared || !acknowledged) return;
+    if (!account || !prepared || !acknowledged || phase !== "prepared") return;
     setPhase("submitting"); setMessage("Waiting for your explicit Mainnet wallet signature…");
     try {
       const provider = new RpcProvider({ nodeUrl: MAINNET_RPC });
@@ -189,7 +205,7 @@ export function PrivatePaymentMvp() {
     <ol className="qualifying-route"><li><b>Creator wallet:</b> shield STRK to register and create receipt 1.</li><li><b>Client wallet:</b> shield enough STRK for the payment and create receipt 2.</li><li><b>Client wallet:</b> pay the registered creator privately and create receipt 3.</li></ol>
     <div className="payment-grid"><article><h3>1 · Connect</h3><button type="button" onClick={checkWallets}>Check compatible wallet</button><p>{walletName || `${wallets.length} installed wallet(s) discovered`}</p><button type="button" className="secondary" onClick={connect} disabled={!walletName || Boolean(account)}>{account ? "Wallet connected" : "Connect on Mainnet"}</button>{account ? <p className="mono">{identity || account.address}<br/><small>{identity ? account.address : "No primary .stark name resolved"}</small></p> : null}</article>
       <article><h3>2 · Prepare</h3><label>Action<select value={operation} onChange={(event) => { setOperation(event.target.value as PaymentOperation); resetPreparation(); }}><option value="shield">Shield STRK</option><option value="pay">Private creator payment</option><option value="withdraw">Withdraw STRK</option></select></label><label>Amount in STRK<input inputMode="decimal" placeholder="Example: 10" value={amount} onChange={(event) => { setAmount(event.target.value); resetPreparation(); }}/></label>{operation !== "shield" ? <label>{operation === "pay" ? "Creator .stark name or address" : "Public withdrawal address"}<input placeholder="creator.stark or 0x…" value={recipient} onChange={(event) => { setRecipient(event.target.value); resetPreparation(); }}/></label> : <p className="payment-note">Shielding may require a separate ERC-20 approval prompt. The approval does not count as a hackathon pool transaction.</p>}<button type="button" onClick={prepare} disabled={!account || phase === "preparing"}>{phase === "preparing" ? "Preparing…" : "Prepare and dry-run"}</button></article>
-      <article><h3>3 · Review and sign</h3><dl className="review-facts"><div><dt>Network</dt><dd>Starknet Mainnet</dd></div><div><dt>Pool</dt><dd>{STRK20_MAINNET_REVIEW_TARGET.address}</dd></div><div><dt>Action</dt><dd>{actionLabel}</dd></div><div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div><div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>{resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}<div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK (live read)` : "Available after dry run"}</dd></div></dl><label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)}/>I reviewed the Mainnet network, pool, action, token, amount, recipient, and fee.</label><button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase === "submitting"}>{phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}</button></article></div>
+      <article><h3>3 · Review and sign</h3><dl className="review-facts"><div><dt>Network</dt><dd>Starknet Mainnet</dd></div><div><dt>Pool</dt><dd>{STRK20_MAINNET_REVIEW_TARGET.address}</dd></div><div><dt>Action</dt><dd>{actionLabel}</dd></div><div><dt>Token</dt><dd>STRK · {STRK_MAINNET_TOKEN}</dd></div><div><dt>Amount</dt><dd>{amount || "—"} STRK</dd></div>{resolvedRecipient ? <div><dt>Recipient</dt><dd>{resolvedRecipient}</dd></div> : null}<div><dt>Pool fee</dt><dd>{fee ? `${fee} STRK (live read)` : "Available after dry run"}</dd></div></dl>{registrationRequired ? <p className="payment-note">First-shield registration: Ready X returned <code>NOT_REGISTERED</code>. Complete this first public shield in Ready X’s own Privacy flow, then reconnect here. Gigstark will not bypass that wallet gate.</p> : null}<label className="review-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={phase !== "prepared"} onChange={(event) => setAcknowledged(event.target.checked)}/>I reviewed the Mainnet network, pool, action, token, amount, recipient, and fee.</label><button type="button" onClick={submit} disabled={!prepared || !acknowledged || phase !== "prepared"}>{phase === "submitting" ? "Waiting for wallet…" : "Request Mainnet signature"}</button></article></div>
     <p className="wallet-flow-status" role="status">{message}</p>
     {hash ? <div className="receipt-card"><b>Latest transaction</b><a href={`https://voyager.online/tx/${hash}`} target="_blank" rel="noreferrer">{hash}</a><button type="button" className="secondary" onClick={() => void verifyReceipt()}>Verify receipt and pool event</button></div> : null}
     {history.length ? <details className="transaction-history" open={verifiedHistory.length >= 3}><summary>Submission evidence · {verifiedHistory.length} verified / {history.length} submitted</summary>{history.map((item) => <div key={item}><a href={`https://voyager.online/tx/${item}`} target="_blank" rel="noreferrer">{item}</a>{verifiedHistory.includes(item) ? <strong className="verified-hash">Verified</strong> : <button type="button" className="secondary" onClick={() => void verifyReceipt(item)}>Verify</button>}</div>)}{verifiedHistory.length >= 3 ? <p className="manifest-hint">Three hashes passed the in-browser receipt check. Add the first three to both <code>strk20.json</code> files, then run the two-provider submission verifier before publishing.</p> : null}</details> : null}
