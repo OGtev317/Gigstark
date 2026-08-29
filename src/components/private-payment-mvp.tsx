@@ -217,7 +217,7 @@ export function PrivatePaymentMvp() {
     } catch (error) {
       if (operation === "shield" && isFirstShieldRegistrationRequired(error)) {
         setPrepared(null); setAcknowledged(false); setRegistrationRequired(true); setPhase("blocked");
-        setMessage("Ready X requires its first shield to be registered in the wallet's own Privacy flow. Shield this reviewed amount in Ready X, preserve the pool-deposit hash, then reconnect Zeerostream.");
+        setMessage("Ready X requires its first shield to be registered in the wallet's own Privacy flow. Shield this reviewed amount in Ready X, preserve the pool-deposit hash, then reconnect ZeeroStream.");
         return;
       }
       setPrepared(null); setAcknowledged(false); setRegistrationRequired(false); setPendingMemo(null); setPhase("blocked");
@@ -358,7 +358,7 @@ export function PrivatePaymentMvp() {
             <p className="eyebrow">Two-user demo route</p>
             <h3 id="demo-route-title">Hand off a public recipient. Keep private state in each wallet.</h3>
           </div>
-          <p>Switch wallets only at the marked handoff. Zeerostream never transfers keys, notes, balances, or proofs between participants.</p>
+          <p>Switch wallets only at the marked handoff. ZeeroStream never transfers keys, notes, balances, or proofs between participants.</p>
         </div>
 
         <ol className="demo-progress">
@@ -559,7 +559,7 @@ export function PrivatePaymentMvp() {
         </ol>
       </section>
 
-      <p className="payment-boundary"><b>Wallet-only boundary:</b> signing keys, viewing keys, notes, witnesses, proofs, and private balances never enter Zeerostream. Deposits and withdrawals are public; private transfers hide pool-side sender, recipient, and amount, while timing remains observable.</p>
+      <p className="payment-boundary"><b>Wallet-only boundary:</b> signing keys, viewing keys, notes, witnesses, proofs, and private balances never enter ZeeroStream. Deposits and withdrawals are public; private transfers hide pool-side sender, recipient, and amount, while timing remains observable.</p>
     </section>
   );
 }

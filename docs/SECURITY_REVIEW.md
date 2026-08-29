@@ -1,4 +1,4 @@
-# Zeerostream internal security review
+# ZeeroStream internal security review
 
 Last reviewed: 2026-08-25
 

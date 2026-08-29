@@ -17,7 +17,7 @@ export default function Home() {
         <section id="top" className="hero">
           <p className="eyebrow">Private creator payments · Starknet Mainnet</p>
           <h1>Pay for the work.<br /><em>Hide the relationship.</em></h1>
-          <p className="lede">Zeerostream is a non-custodial STRK20 payment interface for clients and creators. Shield STRK, pay a registered creator privately, and keep every wallet key and proof inside your wallet.</p>
+          <p className="lede">ZeeroStream is a non-custodial STRK20 payment interface for clients and creators. Shield STRK, pay a registered creator privately, and keep every wallet key and proof inside your wallet.</p>
           <div className="hero-actions">
             <a className="button" href="#pay">Open Mainnet payment flow</a>
             <a href="#boundaries">Understand privacy</a>
@@ -25,7 +25,7 @@ export default function Home() {
           </div>
           <ul className="hero-proof" aria-label="Verified demo highlights">
             <li><b>3 / 3</b><span>Mainnet pool receipts verified</span></li>
-            <li><b>0</b><span>Private keys handled by Zeerostream</span></li>
+            <li><b>0</b><span>Private keys handled by ZeeroStream</span></li>
             <li><b>2 RPCs</b><span>Independent receipt agreement</span></li>
           </ul>
         </section>
@@ -33,7 +33,7 @@ export default function Home() {
         <section className="architecture" aria-label="How a private creator payment works">
           <article><p className="eyebrow">1 · Shield</p><h2>Enter the pool.</h2><p>The deposit edge is public and screened. Your wallet creates the private note.</p></article>
           <article><p className="eyebrow">2 · Wait</p><h2>Let the note mature.</h2><p>New notes generally need about ten blocks before they can be spent.</p></article>
-          <article><p className="eyebrow">3 · Pay</p><h2>Transfer privately.</h2><p>The wallet discovers notes, proves the transfer, signs, and submits without exposing private state to Zeerostream.</p></article>
+          <article><p className="eyebrow">3 · Pay</p><h2>Transfer privately.</h2><p>The wallet discovers notes, proves the transfer, signs, and submits without exposing private state to ZeeroStream.</p></article>
         </section>
 
         <PrivatePaymentMvp />
@@ -44,7 +44,7 @@ export default function Home() {
           <div>
             <p><b>Hidden inside the pool:</b> sender, recipient, token amount, and which private notes were spent.</p>
             <p><b>Public:</b> deposits, withdrawals, transaction timing, registration events, and the fact that the pool was used.</p>
-            <p><b>Never enters Zeerostream:</b> signing keys, viewing keys, seed phrases, private notes, proof witnesses, or private balances without separate consent.</p>
+            <p><b>Never enters ZeeroStream:</b> signing keys, viewing keys, seed phrases, private notes, proof witnesses, or private balances without separate consent.</p>
           </div>
         </section>
 
@@ -54,7 +54,7 @@ export default function Home() {
           <p>Reviewed escrow, subscriptions, Passport policies, custom ZK settlement, encrypted-message transport, tier gates, and a real Oyster workload with verified Nitro attestation remain post-hackathon work. TEE evidence will stay optional and non-authoritative.</p>
         </section>
 
-        <footer>Zeerostream Private Sprint MVP · User wallets retain signing and viewing keys · <a href="https://github.com/starkware-libs/starknet-privacy">STRK20 reference</a></footer>
+        <footer>ZeeroStream Private Sprint MVP · User wallets retain signing and viewing keys · <a href="https://github.com/starkware-libs/starknet-privacy">STRK20 reference</a></footer>
       </main>
     </>
   );

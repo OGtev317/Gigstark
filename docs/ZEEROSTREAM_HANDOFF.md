@@ -1,10 +1,10 @@
-# Zeerostream handoff
+# ZeeroStream handoff
 
 **Updated:** 2026-08-28
 
 ## Current checkpoint
 
-Zeerostream has a working, non-custodial Starknet Mainnet STRK20 payment route:
+ZeeroStream has a working, non-custodial Starknet Mainnet STRK20 payment route:
 
 1. Creator shields STRK and becomes eligible to receive a private transfer.
 2. Client shields STRK and waits for the wallet-managed note-maturity condition.
@@ -85,7 +85,7 @@ the following are complete:
 - A wallet connection is not a `.stark` identity claim; a `.stark` name is only
   a public display/recipient alias.
 - The wallet must complete the first native Ready X shield if it returns
-  `NOT_REGISTERED`; Zeerostream must not bypass this requirement.
+  `NOT_REGISTERED`; ZeeroStream must not bypass this requirement.
 - Never put keys, seed phrases, viewing keys, notes, proofs, witnesses, or
   private balances into Git, browser storage, documentation, logs, or chat.
 - Do not describe escrow, subscriptions, custom ZK settlement, encrypted

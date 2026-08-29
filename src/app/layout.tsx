@@ -5,7 +5,7 @@ import "./starknet-theme.css";
 import "./hackathon-polish.css";
 
 export const metadata: Metadata = {
-  title: "Zeerostream — private creator payments on Starknet",
+  title: "ZeeroStream — private creator payments on Starknet",
   description: "A non-custodial STRK20 interface for private creator payments on Starknet Mainnet.",
 };
 

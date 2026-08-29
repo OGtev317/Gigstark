@@ -10,7 +10,7 @@ import { STRK20_MAINNET_POOL } from "../src/lib/strk20-mainnet";
 
 const ready = () => parseHackathonSubmission({
   transactions: ["0x1", "0x2", "0x3"], contracts: [],
-  demo_video: "https://youtu.be/example", demo_url: "https://gigstark.pages.dev",
+  demo_video: "https://youtu.be/example", demo_url: "https://zeerostream.pages.dev",
 });
 
 test("submission gate requires three distinct hashes, public URLs, and no declared MVP contracts", () => {

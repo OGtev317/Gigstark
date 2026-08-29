@@ -23,5 +23,5 @@ test("repository and public STRK20 submission manifests stay identical and hones
   assert.deepEqual(publicManifest, repositoryManifest);
   parseHackathonSubmission(repositoryManifest);
   assert.deepEqual(repositoryManifest.contracts, []);
-  assert.equal(repositoryManifest.demo_url, "https://gigstark.pages.dev");
+  assert.equal(repositoryManifest.demo_url, "https://zeerostream.pages.dev");
 });

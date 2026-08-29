@@ -1,8 +1,8 @@
-# Zeerostream private messaging and subscription plan
+# ZeeroStream private messaging and subscription plan
 
 ## Product thesis
 
-Zeerostream should ship in two connected layers:
+ZeeroStream should ship in two connected layers:
 
 1. **Private payment memos and encrypted mail**: a metadata-minimizing message
    layer for STRK20 participants. A pool transaction can carry an encrypted
@@ -109,7 +109,7 @@ Later behavior:
 
 ### 4. SDK surface
 
-Add a Zeerostream SDK package before exposing this as app glue:
+Add a ZeeroStream SDK package before exposing this as app glue:
 
 ```ts
 type SendMessageInput = {
@@ -187,7 +187,7 @@ Exit gate: deterministic tests and UI demo prove the envelope model locally.
 
 Goal: ship encrypted onchain mail between reviewed test wallets.
 
-- Implement `ZeerostreamMessageHelper` as a minimal pool-pinned helper.
+- Implement `ZeeroStreamMessageHelper` as a minimal pool-pinned helper.
 - Add Cairo tests for pool-only caller, append ordering, replay rejection,
   payload bounds, expiry, and event shape.
 - Build a read-only indexer that fetches helper events and returns ciphertext
@@ -251,7 +251,7 @@ Only after that is audited, evaluate session authority:
 - Paymaster use must not hide pool fees or create surprise charges.
 
 Exit gate: a user can subscribe, cancel, and prove tier access without exposing
-the subscriber list or giving Zeerostream custody of keys or notes.
+the subscriber list or giving ZeeroStream custody of keys or notes.
 
 ## Build order for this repository
 
@@ -283,7 +283,7 @@ the subscriber list or giving Zeerostream custody of keys or notes.
 The winning story should be:
 
 ```text
-Zeerostream started as private creator payments.
+ZeeroStream started as private creator payments.
 Now the payment can carry an encrypted note.
 That note becomes a private inbox.
 The inbox becomes private negotiation.

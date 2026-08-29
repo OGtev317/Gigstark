@@ -1,13 +1,13 @@
-# Zeerostream
+# ZeeroStream
 
-Zeerostream is a non-custodial STRK20 interface for private creator payments on
+ZeeroStream is a non-custodial STRK20 interface for private creator payments on
 Starknet Mainnet. A client can shield STRK, pay a registered creator inside the
 privacy pool, and withdraw. The connected wallet keeps every signing key,
-viewing key, private note, and witness. Zeerostream sends only the requested public
+viewing key, private note, and witness. ZeeroStream sends only the requested public
 action fields, does not inspect or persist dry-run proof output, and retains only
 public transaction hashes for recovery.
 
-Public demo: [gigstark.pages.dev](https://gigstark.pages.dev)
+Public demo: [zeerostream.pages.dev](https://zeerostream.pages.dev)
 
 Operator guides: [Mainnet payment runbook](docs/MAINNET_PAYMENT_RUNBOOK.md) ·
 [three-minute demo script](docs/DEMO_SCRIPT.md) ·
@@ -55,7 +55,7 @@ measurements, freshness, and workload-bound `user_data`. Any TEE result remains
 optional and non-authoritative for settlement.
 
 The hosted Starknet ID API is not an authentication service and is not required
-by Zeerostream. The wallet proves account control by approving the connection and
+by ZeeroStream. The wallet proves account control by approving the connection and
 signs every transaction itself.
 
 ## Run locally
@@ -118,7 +118,7 @@ source-reproduced V2 pool but deliberately leaves every constructor argument
 unset and unreviewed.
 
 Read [the architecture handoff](docs/ARCHITECTURE.md) before beginning that integration.
-Track implementation status and release gates in the dedicated [Zeerostream roadmap](ROADMAP.md).
+Track implementation status and release gates in the dedicated [ZeeroStream roadmap](ROADMAP.md).
 Review the [compute specimen](compute/README.md) and its explicit hardware and
 test-ceremony boundaries before treating it as deployable.
 Review the explicit trust assumptions and blockers in the

@@ -37,12 +37,12 @@ export function LocalDataTools() {
     } catch (error) { setNotice(error instanceof Error ? error.message : "LOCAL_BACKUP_IMPORT_FAILED"); }
   }
   function resetWorkspace() {
-    if (!window.confirm("Delete only this browser's Zeerostream local marketplace and subscription records? This cannot be recovered unless you exported a backup.")) return;
+    if (!window.confirm("Delete only this browser's ZeeroStream local marketplace and subscription records? This cannot be recovered unless you exported a backup.")) return;
     localStorage.removeItem(MARKETPLACE_KEY); localStorage.removeItem(SUBSCRIPTIONS_KEY);
     window.location.reload();
   }
   return <section className="local-data-tools" aria-labelledby="local-data-title">
-    <div><p className="eyebrow">Local data controls</p><h2 id="local-data-title">Portable, not public.</h2><p>Move validated sample records between browsers with an explicit JSON file. Import replaces only this browser’s Zeerostream product records.</p></div>
+    <div><p className="eyebrow">Local data controls</p><h2 id="local-data-title">Portable, not public.</h2><p>Move validated sample records between browsers with an explicit JSON file. Import replaces only this browser’s ZeeroStream product records.</p></div>
     <div className="order-actions"><button onClick={exportBackup}>Export local records</button><button className="secondary" onClick={() => inputRef.current?.click()}>Import local records</button><button className="secondary" onClick={resetWorkspace}>Reset this browser</button><input ref={inputRef} type="file" accept="application/json,.json" onChange={(event) => void importBackup(event.target.files?.[0])} hidden /></div>
     <p className="notice" role="status">{notice}</p>
   </section>;

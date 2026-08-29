@@ -1,8 +1,8 @@
-# Zeerostream three-minute demo script
+# ZeeroStream three-minute demo script
 
 ## 0:00-0:25 — problem and promise
 
-"Freelance payments expose who paid whom and how much. Zeerostream is a
+"Freelance payments expose who paid whom and how much. ZeeroStream is a
 non-custodial STRK20 interface that lets a client shield STRK and pay a
 registered creator privately on Starknet Mainnet."
 
@@ -12,7 +12,7 @@ Show the live URL and the `PRIVATE SPRINT MVP` badge.
 
 Show **Check compatible wallet**. Explain that capability detection checks only
 Wallet API versions. Wallet connection is the login; `.stark` names are public
-aliases. Zeerostream never receives signing keys, viewing keys, private notes,
+aliases. ZeeroStream never receives signing keys, viewing keys, private notes,
 witnesses, proofs, or private balances.
 
 ## 0:55-1:35 — creator and client shields
@@ -44,4 +44,4 @@ Deposits, withdrawals, timing, and pool use remain public. Escrow,
 subscriptions, custom ZK settlement, messaging transport, and Oyster TEE are
 preserved as post-hackathon work and are not represented as live."
 
-End on <https://gigstark.pages.dev>.
+End on <https://zeerostream.pages.dev>.

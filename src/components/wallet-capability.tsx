@@ -501,7 +501,7 @@ function WinnerClaimReview({ account }: { account: WalletAccountV6 | null }) {
           </select>
         </label>
         <ReviewField
-          label="Action-bound ZeerostreamPassport receipt JSON"
+          label="Action-bound ZeeroStreamPassport receipt JSON"
           value={fields.proofJson}
           onChange={(value) => updateField("proofJson", value)}
           placeholder='{"policyId":"0x…","audience":"0x…","purpose":"1","credentialClass":"0x…","scopeNullifier":"0x…","proofCommitment":"0x…","issuedAt":"0","expiresAt":"0","signatureR":"0x…","signatureS":"0x…"}'
