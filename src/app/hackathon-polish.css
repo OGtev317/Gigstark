@@ -152,6 +152,18 @@ button {
   letter-spacing: 0;
 }
 
+.hero-wordmark {
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.hero-wordmark span {
+  background: var(--starknet-gradient);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
 .hero h1 em {
   font-family: inherit;
   font-style: normal;

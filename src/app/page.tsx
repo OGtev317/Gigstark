@@ -17,7 +17,7 @@ export default function Home() {
 
         <section id="top" className="hero">
           <p className="eyebrow">Premium creator payments · Starknet Mainnet</p>
-          <h1>Creator access without the public wallet trail.</h1>
+          <h1 className="hero-wordmark">ZEERO<span>STREAM</span></h1>
           <p className="lede">ZeeroStream gives paid creator pages a private checkout lane. Subscribers can send a STRK20 payment with an encrypted memo receipt while wallet keys, notes, and proofs stay inside their own wallet.</p>
           <div className="hero-actions">
             <a className="button" href="#creator">View creator page</a>
