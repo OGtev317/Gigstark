@@ -1,24 +1,90 @@
 # ZeeroStream handoff
 
-**Updated:** 2026-08-28
+**Updated:** 2026-08-30
 
 ## Current checkpoint
 
-ZeeroStream has a working, non-custodial Starknet Mainnet STRK20 payment route:
+ZeeroStream is the renamed Gigstark hackathon build. The public MVP is a
+non-custodial private creator checkout on Starknet Mainnet:
 
-1. Creator shields STRK and becomes eligible to receive a private transfer.
-2. Client shields STRK and waits for the wallet-managed note-maturity condition.
-3. Client makes a private creator payment through the reviewed STRK20 pool.
+1. Client or creator uses a privacy-enabled wallet for STRK20 actions.
+2. The app prepares a reviewed Mainnet pool action and stops for wallet review.
+3. The user signs inside their own wallet.
+4. The app records only public receipt hashes and optional encrypted memo
+   receipt data.
 
-The browser never receives or stores wallet keys, seed phrases, viewing keys,
-notes, witnesses, proofs, or private balances. Every payment request remains a
-user-controlled Ready X wallet action.
+The live page now presents the product as a premium creator-social checkout:
+creator profile, locked drops, private payment CTA, encrypted memo receipt demo,
+and a selective-disclosure access demo.
+
+## Live URLs
+
+- Production site: `https://zeerostream.pages.dev`
+- Latest deployment checked live: `https://06be0805.zeerostream.pages.dev`
+- Public manifest: `https://zeerostream.pages.dev/strk20.json`
+- Git remote: `https://github.com/OGtev317/Gigstark.git`
+
+## Latest source state
+
+Latest pushed commit on `origin/main`:
+
+```text
+6508f82 Add selective disclosure demo
+```
+
+Recent shipped commits:
+
+```text
+6508f82 Add selective disclosure demo
+bb0b46d Use ZeeroStream wordmark as hero headline
+8f2b919 Increase ZeeroStream code rain density
+d871048 Switch ZeeroStream to blue grey palette
+46c32ff Refresh ZeeroStream creator page
+b87b027 Use ZeeroStream Pages URL
+f2b4421 Rename build to Zeerostream
+c7b78ef record verified mainnet hackathon receipts
+```
+
+The worktree was clean before this handoff update. Re-check `git status
+--short` before resuming.
+
+## Shipped functionality
+
+- ZeeroStream branding, package name, public manifest URL, and Cloudflare Pages
+  project are aligned around `zeerostream`.
+- Mainnet private payment MVP remains the core flow:
+  - wallet capability check,
+  - Mainnet wallet connection,
+  - reviewed STRK20 pool target check,
+  - dry-run before signing,
+  - explicit acknowledgement before wallet signature,
+  - receipt verification against the reviewed pool.
+- Encrypted memo receipt MVP is wired into the private payment flow:
+  - optional private memo textarea,
+  - local memo key/contact demo,
+  - ciphertext-only receipt storage,
+  - creator inbox import/decrypt demo,
+  - wrong/tampered/replayed memo packages fail in tests.
+- Creator-social page layer is live:
+  - ZeeroStream hero wordmark,
+  - creator profile preview,
+  - locked feed drops,
+  - private checkout panel,
+  - ultra-blue, silver, and wolf-grey palette,
+  - denser blue/silver code-rain background.
+- Selective-disclosure demo is live:
+  - `Disclosure` nav link,
+  - "Show access. Hide everything else." section,
+  - tier-gate demo verifier,
+  - minimum-disclosure claim demo,
+  - explicit copy that wallet history, identity, private notes, memos, and proof
+    witnesses are not disclosed.
 
 ## Verified Mainnet evidence
 
-The three hashes recorded in both `strk20.json` files are the competition
-evidence set. Each was checked against two independent Starknet RPC providers
-for an accepted, successful receipt containing an event from the reviewed pool.
+The three hashes in both `strk20.json` files are the competition evidence set.
+Each represents an accepted, successful receipt containing an event from the
+reviewed pool.
 
 | Role | Transaction hash |
 | --- | --- |
@@ -26,67 +92,133 @@ for an accepted, successful receipt containing an event from the reviewed pool.
 | Client shield | `0x03334787479e79a867e85c7427699a7ad3530934800c11c4ed5b0fc431b59f29` |
 | Private payment | `0x7f11f4e677a5d6d9cf939d652f5c471e081742bc6aec152491dc56e8757aca0` |
 
-The reviewed pool is:
+Reviewed Mainnet STRK20 pool:
 
 ```text
 0x040337b1af3c663e86e333bab5a4b28da8d4652a15a69beee2b677776ffe812a
 ```
 
-Do not infer the private payment sender, recipient, or amount from its public
-receipt. The public receipt proves successful pool use, not those hidden fields.
+Do not infer private payment sender, recipient, amount, or memo content from
+the public receipt. The receipt proves reviewed pool use, not hidden fields.
 
-## Current source-control state
+## Last checks passed
 
-- `origin/main` includes commit `c7b78ef` (`record verified mainnet hackathon receipts`), which records the three receipt hashes and hardens first-shield registration handling.
-- Local, uncommitted UI work adds the two-user demo rail, creator handoff card,
-  client preflight, and receipt timeline in:
-  - `src/components/private-payment-mvp.tsx`
-  - `src/app/globals.css`
-
-Before any future commit, inspect the dirty diff and preserve unrelated user
-changes.
-
-## Checks last passed
+These were run during the latest page work:
 
 ```zsh
 npm test
 npm run typecheck
 npm run build
-npm run verify:strk20-mainnet
+git diff --check
 ```
 
-`npm run verify:hackathon-submission` is deliberately not ready until both of
-the following are complete:
+Latest test count observed:
 
-1. A public demo-video URL is set as `demo_video` in both `strk20.json` and
-   `public/strk20.json`.
-2. The built `out/` directory is deployed to the existing `gigstark` Pages
-   project and the live `/strk20.json` matches the repository manifest.
+```text
+74 passed / 74 total
+```
 
-## Next safe sequence
+The production route was fetched after deployment and returned the new
+selective-disclosure section:
 
-1. Record a public, approximately three-minute demo using
-   `docs/DEMO_SCRIPT.md`. Show creator shield, client shield, private payment,
-   the three receipt hashes, and the privacy boundary. Do not show secrets or
-   private wallet data.
-2. Add the resulting public video URL to both manifests.
-3. Re-run the checks above plus:
+```text
+https://zeerostream.pages.dev
+```
+
+## Known blocker
+
+`npm run verify:hackathon-submission` still fails because `demo_video` is empty:
+
+```text
+SUBMISSION_VIDEO_URL_INVALID
+```
+
+Current live manifest shape:
+
+```json
+{
+  "transactions": [
+    "0x016301b81ab2fce40fd224140a592a7c23d408ea2f3eb893196c7e4d337f3217",
+    "0x03334787479e79a867e85c7427699a7ad3530934800c11c4ed5b0fc431b59f29",
+    "0x7f11f4e677a5d6d9cf939d652f5c471e081742bc6aec152491dc56e8757aca0"
+  ],
+  "contracts": [],
+  "demo_video": "",
+  "demo_url": "https://zeerostream.pages.dev"
+}
+```
+
+## Next pickup sequence
+
+1. Re-check the repo:
 
    ```zsh
+   cd /Users/tevdev/Desktop/Gigstark
+   git status --short
+   git log -1 --oneline
+   ```
+
+2. Record a public three-minute demo video. Use plain-language positioning:
+
+   ```text
+   ZeeroStream is a private checkout page for creators where subscribers can
+   pay and attach an encrypted note without publicly exposing who paid whom.
+   ```
+
+3. In the demo, show:
+   - creator-social page,
+   - private payment flow,
+   - optional encrypted memo,
+   - creator inbox decrypt demo,
+   - selective-disclosure section,
+   - three public receipt hashes,
+   - explicit wallet-only privacy boundary.
+
+4. Do not show or paste wallet secrets, seed phrases, viewing keys, private
+   notes, proof witnesses, private balances, or identity documents.
+
+5. Add the public demo-video URL to both:
+   - `strk20.json`
+   - `public/strk20.json`
+
+6. Re-run:
+
+   ```zsh
+   npm test
+   npm run typecheck
+   npm run build
+   npm run verify:strk20-mainnet
    npm run verify:hackathon-submission
    ```
 
-4. Only when explicitly authorized, deploy the already-built static output to
-   the existing Pages project, fetch the canonical URL and `/strk20.json`, then
-   commit and push the verified deployment state.
+7. If the verifier passes, deploy the static export:
+
+   ```zsh
+   npx wrangler pages deploy out --project-name zeerostream --branch main
+   ```
+
+8. Fetch and verify:
+
+   ```zsh
+   curl -s https://zeerostream.pages.dev/strk20.json
+   ```
+
+9. Commit and push only after the manifest and deployment are verified.
 
 ## Boundaries
 
-- A wallet connection is not a `.stark` identity claim; a `.stark` name is only
-  a public display/recipient alias.
-- The wallet must complete the first native Ready X shield if it returns
-  `NOT_REGISTERED`; ZeeroStream must not bypass this requirement.
-- Never put keys, seed phrases, viewing keys, notes, proofs, witnesses, or
-  private balances into Git, browser storage, documentation, logs, or chat.
-- Do not describe escrow, subscriptions, custom ZK settlement, encrypted
-  messaging, Passport policy, or Oyster/TEE work as live hackathon functionality.
+- A wallet connection is not a `.stark` identity claim.
+- A `.stark` name is only a public display or recipient alias.
+- Use `supportedWalletApi` capability detection; do not probe private balances.
+- Preserve dry-run -> visible review -> acknowledgement -> user wallet signature
+  -> accepted receipt/pool-event verification.
+- If Ready X returns `NOT_REGISTERED`, use the explicit first-shield
+  registration path and wait for note maturity before spending.
+- Never move viewing keys, note discovery, proving, signing, or private state
+  into the app.
+- Never commit chat logs, transcripts, local sessions, wallet secrets, seed
+  phrases, private keys, viewing keys, notes, proof witnesses, or private
+  balances.
+- Do not claim full onchain encrypted mail, helper-contract message storage,
+  indexer discovery, production subscriptions, autonomous billing, or creator
+  analytics as shipped. Those remain phase-two work.
