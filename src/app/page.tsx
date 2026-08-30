@@ -1,5 +1,7 @@
 import { CodeRain } from "../components/code-rain";
+import { PassportDemo } from "../components/passport-demo";
 import { PrivatePaymentMvp } from "../components/private-payment-mvp";
+import { TierDemo } from "../components/tier-demo";
 
 export default function Home() {
   return (
@@ -11,6 +13,7 @@ export default function Home() {
           <a className="mark" href="#top">ZEERO<span>STREAM</span></a>
           <span className="badge">PRIVATE SPRINT MVP</span>
           <a href="#creator">Creator page</a>
+          <a href="#disclosure">Disclosure</a>
           <a href="#pay">Private pay</a>
           <a href="#evidence">Evidence</a>
         </nav>
@@ -95,6 +98,24 @@ export default function Home() {
           <article><p className="eyebrow">1 · Shield</p><h2>Enter the pool.</h2><p>The deposit edge is public and screened. Your wallet creates the private note.</p></article>
           <article><p className="eyebrow">2 · Wait</p><h2>Let the note mature.</h2><p>New notes generally need about ten blocks before they can be spent.</p></article>
           <article><p className="eyebrow">3 · Pay</p><h2>Transfer privately.</h2><p>The wallet discovers notes, proves the transfer, signs, and submits without exposing private state to ZeeroStream.</p></article>
+        </section>
+
+        <section id="disclosure" className="selective-disclosure" aria-labelledby="disclosure-title">
+          <div className="disclosure-heading">
+            <p className="eyebrow">Selective disclosure</p>
+            <h2 id="disclosure-title">Show access. Hide everything else.</h2>
+            <p>A creator gate should only learn the answer it needs: this person has the right tier for this page right now. It should not scan wallet history, payment relationships, encrypted memos, private notes, or proof witnesses.</p>
+          </div>
+          <div className="disclosure-strip" aria-label="Selective disclosure fields">
+            <span><b>Disclose</b> Studio tier</span>
+            <span><b>Bind</b> this creator feed</span>
+            <span><b>Hide</b> wallet history</span>
+            <span><b>Reject</b> replayed claims</span>
+          </div>
+          <div className="disclosure-demo-grid">
+            <TierDemo />
+            <PassportDemo />
+          </div>
         </section>
 
         <PrivatePaymentMvp />

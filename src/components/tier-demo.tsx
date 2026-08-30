@@ -16,5 +16,5 @@ export function TierDemo() {
       setMessage("Tier proof accepted for this audience and scope.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "VERIFICATION_FAILED"); }
   };
-  return <section className={styles.panel}><p className="eyebrow">Passport-inspired tier verifier</p><h2>Verify access, never scan a wallet.</h2><p>The verifier accepts only a current, audience-bound Studio-tier receipt with a scoped anti-replay value. It receives no wallet history, identity, proof witness, or delivery data.</p><button onClick={check}>Verify demo tier proof</button><p className={styles.notice} role="status">{message}</p></section>;
+  return <section className={styles.panel}><p className="eyebrow">Tier gate</p><h2>Verify access, never scan a wallet.</h2><p>The gate checks only a current Studio-tier receipt for this creator feed. It receives no wallet history, identity, proof witness, payment memo, or delivery data.</p><button onClick={check}>Verify demo access claim</button><p className={styles.notice} role="status">{message}</p></section>;
 }
