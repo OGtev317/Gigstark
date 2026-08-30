@@ -32,7 +32,7 @@ export function CodeRain() {
     let streams: Stream[] = [];
     let animationFrame = 0;
     let lastFrameTime = performance.now();
-    const columnWidth = 19;
+    const columnWidth = 15;
 
     function randomGlyph() {
       return GLYPHS[Math.floor(Math.random() * GLYPHS.length)] ?? "0";
@@ -57,7 +57,7 @@ export function CodeRain() {
       drawingCanvas.style.height = `${window.innerHeight}px`;
       drawingContext.setTransform(ratio, 0, 0, ratio, 0, 0);
       drawingContext.textBaseline = "top";
-      streams = Array.from({ length: Math.ceil(window.innerWidth / columnWidth) }, (_, index) => {
+      streams = Array.from({ length: Math.ceil(window.innerWidth / columnWidth) + 3 }, (_, index) => {
         const stream: Stream = {
           x: index * columnWidth + Math.random() * 4,
           y: 0,
