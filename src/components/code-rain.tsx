@@ -77,7 +77,7 @@ export function CodeRain() {
       const { innerWidth: width, innerHeight: height } = window;
       drawingContext.globalCompositeOperation = "source-over";
       drawingContext.shadowBlur = 0;
-      drawingContext.fillStyle = "rgba(0, 0, 0, 0.105)";
+      drawingContext.fillStyle = "rgba(2, 4, 13, 0.12)";
       drawingContext.fillRect(0, 0, width, height);
 
       streams.forEach((stream) => {
@@ -90,18 +90,18 @@ export function CodeRain() {
 
           const strength = Math.pow(1 - index / stream.length, 1.45) * stream.opacity;
           if (index === 0) {
-            drawingContext.shadowColor = "rgba(210, 255, 225, 0.95)";
+            drawingContext.shadowColor = "rgba(212, 217, 226, 0.95)";
             drawingContext.shadowBlur = 13;
-            drawingContext.fillStyle = "rgba(238, 255, 244, 1)";
+            drawingContext.fillStyle = "rgba(238, 242, 248, 1)";
           } else if (index < 3) {
-            drawingContext.shadowColor = "rgba(85, 255, 146, 0.75)";
+            drawingContext.shadowColor = "rgba(111, 141, 255, 0.75)";
             drawingContext.shadowBlur = 7;
-            drawingContext.fillStyle = `rgba(157, 255, 190, ${strength})`;
+            drawingContext.fillStyle = `rgba(177, 191, 255, ${strength})`;
           } else {
             drawingContext.shadowBlur = 0;
             drawingContext.fillStyle = stream.accent
-              ? `rgba(192, 95, 255, ${strength * 0.64})`
-              : `rgba(22, 238, 103, ${strength * 0.86})`;
+              ? `rgba(212, 217, 226, ${strength * 0.7})`
+              : `rgba(49, 93, 255, ${strength * 0.82})`;
           }
           drawingContext.fillText(stream.glyphs[index] ?? "0", stream.x, y);
         }
