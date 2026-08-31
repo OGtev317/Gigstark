@@ -17,7 +17,8 @@
     "verify:strk20-pool": "tsx scripts/verify-strk20-sepolia.ts",
     "verify:strk20-mainnet": "tsx scripts/verify-strk20-mainnet.ts",
     "verify:hackathon-submission": "tsx scripts/verify-hackathon-submission.ts",
-    "review:mainnet-deployment": "tsx scripts/review-mainnet-deployment.ts"
+    "review:mainnet-deployment": "tsx scripts/review-mainnet-deployment.ts",
+    "demo:video": "swift scripts/generate-zeerostream-demo-video.swift public/zeerostream-demo.mp4"
   },
   "dependencies": {
     "@starknet-io/get-starknet-discovery": "6.0.2",

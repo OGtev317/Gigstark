@@ -1,6 +1,6 @@
 # ZeeroStream handoff
 
-**Updated:** 2026-08-30
+**Updated:** 2026-08-31
 
 ## Current checkpoint
 
@@ -20,21 +20,22 @@ and a selective-disclosure access demo.
 ## Live URLs
 
 - Production site: `https://zeerostream.pages.dev`
-- Latest deployment checked live: `https://06be0805.zeerostream.pages.dev`
+- Latest deployment checked live: `https://bcdc0f0c.zeerostream.pages.dev`
 - Public manifest: `https://zeerostream.pages.dev/strk20.json`
 - Git remote: `https://github.com/OGtev317/Gigstark.git`
 
 ## Latest source state
 
-Latest pushed commit on `origin/main`:
+Latest source update in this handoff:
 
 ```text
-6508f82 Add selective disclosure demo
+Add ZeeroStream public demo video
 ```
 
 Recent shipped commits:
 
 ```text
+current Add ZeeroStream public demo video
 6508f82 Add selective disclosure demo
 bb0b46d Use ZeeroStream wordmark as hero headline
 8f2b919 Increase ZeeroStream code rain density
@@ -107,8 +108,11 @@ These were run during the latest page work:
 
 ```zsh
 npm test
+npm run demo:video
 npm run typecheck
 npm run build
+npm run verify:strk20-mainnet
+npm run verify:hackathon-submission
 git diff --check
 ```
 
@@ -125,13 +129,16 @@ selective-disclosure section:
 https://zeerostream.pages.dev
 ```
 
-## Known blocker
+## Current submission state
 
-`npm run verify:hackathon-submission` still fails because `demo_video` is empty:
+`demo_video` is now set to the bundled public MP4 demo asset:
 
 ```text
-SUBMISSION_VIDEO_URL_INVALID
+https://zeerostream.pages.dev/zeerostream-demo.mp4
 ```
+
+The production URL returned `200` with `content-type: video/mp4`, and
+`npm run verify:hackathon-submission` returned `READY_TO_SCORE`.
 
 Current live manifest shape:
 
@@ -143,7 +150,7 @@ Current live manifest shape:
     "0x7f11f4e677a5d6d9cf939d652f5c471e081742bc6aec152491dc56e8757aca0"
   ],
   "contracts": [],
-  "demo_video": "",
+  "demo_video": "https://zeerostream.pages.dev/zeerostream-demo.mp4",
   "demo_url": "https://zeerostream.pages.dev"
 }
 ```
@@ -158,7 +165,8 @@ Current live manifest shape:
    git log -1 --oneline
    ```
 
-2. Record a public three-minute demo video. Use plain-language positioning:
+2. Regenerate or replace the public three-minute demo video if the script needs
+   a human voiceover. Use plain-language positioning:
 
    ```text
    ZeeroStream is a private checkout page for creators where subscribers can
@@ -177,33 +185,30 @@ Current live manifest shape:
 4. Do not show or paste wallet secrets, seed phrases, viewing keys, private
    notes, proof witnesses, private balances, or identity documents.
 
-5. Add the public demo-video URL to both:
-   - `strk20.json`
-   - `public/strk20.json`
-
-6. Re-run:
+5. Re-run:
 
    ```zsh
    npm test
+   npm run demo:video
    npm run typecheck
    npm run build
    npm run verify:strk20-mainnet
    npm run verify:hackathon-submission
    ```
 
-7. If the verifier passes, deploy the static export:
+6. If the verifier passes, deploy the static export:
 
    ```zsh
    npx wrangler pages deploy out --project-name zeerostream --branch main
    ```
 
-8. Fetch and verify:
+7. Fetch and verify:
 
    ```zsh
    curl -s https://zeerostream.pages.dev/strk20.json
    ```
 
-9. Commit and push only after the manifest and deployment are verified.
+8. Commit and push only after the manifest and deployment are verified.
 
 ## Boundaries
 
