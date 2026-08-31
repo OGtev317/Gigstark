@@ -20,7 +20,7 @@ and a selective-disclosure access demo.
 ## Live URLs
 
 - Production site: `https://zeerostream.pages.dev`
-- Latest deployment checked live: `https://bcdc0f0c.zeerostream.pages.dev`
+- Latest deployment checked live: `https://d1ff7a77.zeerostream.pages.dev`
 - Public manifest: `https://zeerostream.pages.dev/strk20.json`
 - Git remote: `https://github.com/OGtev317/Gigstark.git`
 
@@ -35,7 +35,8 @@ Add ZeeroStream public demo video
 Recent shipped commits:
 
 ```text
-current Add ZeeroStream public demo video
+current Add face-camera ZeeroStream demo video
+cc2b2e6 Add ZeeroStream public demo video
 6508f82 Add selective disclosure demo
 bb0b46d Use ZeeroStream wordmark as hero headline
 8f2b919 Increase ZeeroStream code rain density
@@ -108,7 +109,7 @@ These were run during the latest page work:
 
 ```zsh
 npm test
-npm run demo:video
+npm run demo:video:face
 npm run typecheck
 npm run build
 npm run verify:strk20-mainnet
@@ -137,8 +138,11 @@ https://zeerostream.pages.dev
 https://zeerostream.pages.dev/zeerostream-demo.mp4
 ```
 
-The production URL returned `200` with `content-type: video/mp4`, and
-`npm run verify:hackathon-submission` returned `READY_TO_SCORE`.
+The current public MP4 keeps the generated ZeeroStream product demo as the
+screen layer and overlays the supplied face-camera recording and audio for the
+first 71.30 seconds. The production URL returned `200` with
+`content-type: video/mp4`, and `npm run verify:hackathon-submission` returned
+`READY_TO_SCORE`.
 
 Current live manifest shape:
 
@@ -189,7 +193,7 @@ Current live manifest shape:
 
    ```zsh
    npm test
-   npm run demo:video
+   npm run demo:video:face
    npm run typecheck
    npm run build
    npm run verify:strk20-mainnet
